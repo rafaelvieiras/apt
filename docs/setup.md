@@ -44,6 +44,18 @@ it, add one Cache Rule in the dashboard for `apt.rafaelvieiras.com`:
 Without that rule Cloudflare does not cache `.gz`, `.xz`, `.deb` or extensionless
 files such as `Release` by default.
 
+Do **not** enable Cache Reserve (it is paid). Cache Rules and Transform Rules are free
+(10 of each on the Free plan).
+
+### Landing page on `/` (optional)
+
+R2 does not serve `index.html` for `/`. Add a Transform Rule (Rules → Transform Rules →
+Rewrite URL) with the filter `(http.host eq "apt.rafaelvieiras.com" and http.request.uri.path eq "/")`
+and **Rewrite path** to the static value `/index.html`.
+
+Both conditions are required. With the path condition missing, every URL is rewritten to the
+landing page and `apt update` breaks.
+
 ## 3. R2 API token
 
 Dashboard → R2 → **Manage API tokens** → create a token with **Object Read & Write**,
@@ -86,7 +98,14 @@ Check caching on the edge:
 
 ```bash
 curl -sI https://apt.rafaelvieiras.com/pool/main/y/yazi/yazi_26.9.1-1_amd64.deb | grep -iE 'cache-control|cf-cache-status'
-# second request should say: cf-cache-status: HIT
+```
+
+`curl -I` sends `HEAD`, which Cloudflare never stores, so it always says `DYNAMIC`.
+Test with `GET`:
+
+```bash
+for i in 1 2; do curl -s -D - -o /dev/null https://apt.rafaelvieiras.com/index.json | grep -i cf-cache-status; done
+# second line should say HIT
 ```
 
 ## Rotating the key
