@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from aptrepo import debbuild, debversion, licenses, publish, recipe, repo, sign, storage, upstream
+from aptrepo import debbuild, debversion, licenses, publish, recipe, repo, sign, site, storage, upstream
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -332,6 +332,85 @@ class ArchAll(unittest.TestCase):
             self.assertIn("tool_1-1_all.deb", repo.render_packages(s, arch).decode())
 
 
+class Site(unittest.TestCase):
+    FP = "A1B2C3D4E5F60718293A4B5C6D7E8F9012345678"
+
+    def state(self, **over):
+        s = repo.empty_state()
+        s["generated"] = "2026-05-20T06:17:03Z"
+        for name, kw in {
+            "alpha": {"note": "Needs glibc 2.38 or newer."},
+            "beta": {},
+            "beta-runtime": {"desc": "Transitional package for beta"},
+        }.items():
+            kw = {**kw, **over.get(name, {})}
+            repo.add_version(
+                s, name=name, homepage=kw.get("homepage", f"https://example.test/{name}"), license="MIT",
+                version="1.2.3-1", upstream_version="1.2.3", source="https://x/r", released="2026-05-19T10:00:00Z",
+                arches={a: {"filename": "f", "size": 1, "md5": "", "sha1": "", "sha256": "",
+                            "control": f"Package: {name}\nDescription: {kw.get('desc', 'Does things')}"}
+                        for a in ("amd64", "arm64")},
+                note=kw.get("note", ""),
+            )
+        return s
+
+    def page(self, state=None):
+        return site.render(state or self.state(), CFG, self.FP)
+
+    def test_install_snippet_uses_config_and_fixed_paths(self):
+        page = self.page()
+        for text in (
+            f"sudo curl -fsSL {CFG.base_url}/key.gpg -o /etc/apt/keyrings/rafaelvieiras-apt.gpg",
+            "sudo tee /etc/apt/sources.list.d/rafaelvieiras-apt.sources",
+            "Types: deb", f"URIs: {CFG.base_url}/", f"Suites: {CFG.suite}", f"Components: {CFG.component}",
+            "Signed-By: /etc/apt/keyrings/rafaelvieiras-apt.gpg", "sudo apt update",
+        ):
+            self.assertIn(text, page)
+
+    def test_fingerprint_and_packages_are_listed(self):
+        page = self.page()
+        self.assertIn("A1B2 C3D4 E5F6 0718 293A", page)
+        self.assertIn(f'data-copy="{self.FP}"', page)
+        for name in ("alpha", "beta"):
+            self.assertIn(f"sudo apt install {name}", page)
+        self.assertIn("1.2.3", page)
+        self.assertIn("Needs glibc 2.38 or newer.", page)
+        self.assertIn("2026-05-20 06:17 UTC", page)
+        self.assertNotIn("sudo apt install beta-runtime", page)  # transitional: listed, not a card
+        self.assertIn("beta-runtime", page)
+
+    def test_old_state_without_notes_renders(self):
+        state = self.state()
+        for entry in state["packages"].values():
+            entry.pop("note", None)
+        self.assertIn("sudo apt install alpha", self.page(state))
+        self.assertIn("No packages published yet", self.page(repo.empty_state()))
+
+    def test_hostile_values_are_escaped(self):
+        evil = '"><script>alert(1)</script>'
+        state = self.state(alpha={"homepage": "javascript:alert(1)", "note": evil, "desc": evil})
+        cfg = repo.RepoConfig(**{**CFG.__dict__, "origin": evil, "description": evil})
+        page = site.render(state, cfg, "AB" + evil)
+        self.assertNotIn(evil, page)
+        self.assertEqual(page.count("<script>"), 1)  # only the copy-button script
+        self.assertNotIn("javascript:", page)
+
+    def test_no_external_resources_and_small(self):
+        page = self.page()
+        self.assertFalse(re.search(r'<(?:script|img|iframe|source|audio|video)\b[^>]*\bsrc=', page))
+        self.assertFalse(re.search(r'<link\b[^>]*rel="(?:stylesheet|preload|prefetch|preconnect)"', page))
+        self.assertNotIn("@import", page)
+        self.assertNotRegex(page, r"url\(\s*['\"]?(?:https?:)?//")
+        self.assertLess(len(page.encode()), 60_000)
+
+    def test_page_works_without_javascript(self):
+        page = self.page()
+        self.assertIn('lang="en"', page)
+        self.assertIn('class="skip"', page)
+        self.assertRegex(page, r'<button type="button" class="copy"[^>]* hidden')  # hidden until JS enables it
+        self.assertIn("<details>", page)
+
+
 class RecipeNote(unittest.TestCase):
     def test_note_is_parsed_stored_and_optional(self):
         base = {"name": "tool", "license": "MIT", "source": {"repo": "a/b"}, "build": {"kind": "deb"},
@@ -401,6 +480,7 @@ class PublishFlow(unittest.TestCase):
         self.assertEqual(set(state["packages"]), {"tool", "tool-runtime"})
         self.assertEqual(state["packages"]["tool"]["note"], "Needs nothing.")
         self.assertNotIn("note", state["packages"]["tool-runtime"])
+        self.assertIn(b"Needs nothing.", self.store.get("index.html"))
         self.assertTrue(self.store.exists("pool/main/t/tool/tool_1.0.0-1_amd64.deb"))
         self.assertTrue(self.store.exists("pool/main/t/tool-runtime/tool-runtime_1.0.0-1_amd64.deb"))
         self.assertEqual(self.store.headers["pool/main/t/tool/tool_1.0.0-1_amd64.deb"], storage.IMMUTABLE)
