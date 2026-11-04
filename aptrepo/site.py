@@ -30,6 +30,8 @@ DATA_PATH = "site/src/data/site-data.json"
 
 # A site upload must never be able to shadow apt's own paths or the public key.
 RESERVED_PREFIXES = ("dists/", "pool/", "key.")
+# Written into every page by the Astro build when it fell back to sample data.
+SAMPLE_MARKER = b'<meta name="site-data" content="sample">'
 RESERVED_KEYS = frozenset({"index.json", "dists", "pool"})
 
 
@@ -132,8 +134,11 @@ def plan_upload(dist: Path) -> list[tuple[str, Path, str | None]]:
     extensionless copies) could shadow an apt path.
     """
     dist = Path(dist)
-    if not (dist / "index.html").is_file():
+    home = dist / "index.html"
+    if not home.is_file():
         raise SiteError(f"{dist}/index.html not found; run the site build first")
+    if SAMPLE_MARKER in home.read_bytes():
+        raise SiteError("this build used sample data (site/src/data/sample.json); run 'site-data' and build again")
     assets: list[tuple[str, Path, str | None]] = []
     files: list[tuple[str, Path, str | None]] = []
     pages: list[tuple[str, Path, str | None]] = []

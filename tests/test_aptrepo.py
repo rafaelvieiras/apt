@@ -561,6 +561,13 @@ class SiteUpload(unittest.TestCase):
         with self.assertRaises(site.SiteError):
             site.upload(self.store, self.dist, log=lambda *_: None)
 
+    def test_refuses_a_build_made_from_sample_data(self):
+        self.basic()
+        (self.dist / "index.html").write_bytes(b'<head><meta name="site-data" content="sample"></head>')
+        with self.assertRaises(site.SiteError):
+            site.upload(self.store, self.dist, log=lambda *_: None)
+        self.assertEqual(self.store.headers, {})
+
     def test_requires_a_build_and_refuses_symlinks(self):
         with self.assertRaises(site.SiteError):
             site.upload(self.store, self.dist, log=lambda *_: None)
