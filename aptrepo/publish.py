@@ -7,7 +7,7 @@ Upload order matters for clients that fetch while we publish:
 3. ``Packages*`` and ``Release`` (reference only what is already uploaded)
 4. ``InRelease`` / ``Release.gpg`` last, so no signed index ever points at a
    file that is not there yet
-5. ``index.json`` / ``index.html`` / keys
+5. ``index.json`` / keys (the landing site is published separately, see ``site.py``)
 6. cleanup of pruned pool files and old by-hash copies
 """
 
@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import debbuild, debversion, licenses, repo, sign, site, upstream
+from . import debbuild, debversion, licenses, repo, sign, upstream
 from .recipe import Recipe, load_recipes
 from .storage import Storage
 
@@ -220,7 +220,6 @@ def publish(
 
         public = (key_path or Path(cfg.key_file)).read_bytes()
         with sign.Signer(private_key, passphrase) as signer:
-            signer_fingerprint = signer.fingerprint
             if sign.public_fingerprint(public) != signer.fingerprint:
                 raise sign.SignError("signing key does not match the published public key")
             in_release = signer.clearsign(rendered.release)
@@ -238,12 +237,10 @@ def publish(
 
         storage.put("key.asc", public)
         storage.put("key.gpg", sign.dearmor(public))
-        fingerprint = signer_fingerprint
         old_current = state["byhash"]["current"]
         old_previous = state["byhash"]["previous"]
         state["byhash"] = {"current": sorted(rendered.byhash), "previous": old_current}
         storage.put("index.json", (json.dumps(state, indent=1, sort_keys=True) + "\n").encode())
-        storage.put("index.html", site.render(state, cfg, fingerprint).encode())
 
         # Content-addressed: a key can be in several generations. Keep this one and
         # the one before it (clients mid-update may still ask for it), drop the rest.

@@ -365,7 +365,7 @@ class ArchAll(unittest.TestCase):
             self.assertIn("tool_1-1_all.deb", repo.render_packages(s, arch).decode())
 
 
-class Site(unittest.TestCase):
+class SiteExport(unittest.TestCase):
     FP = "A1B2C3D4E5F60718293A4B5C6D7E8F9012345678"
 
     def state(self, **over):
@@ -379,69 +379,231 @@ class Site(unittest.TestCase):
             kw = {**kw, **over.get(name, {})}
             repo.add_version(
                 s, name=name, homepage=kw.get("homepage", f"https://example.test/{name}"), license="MIT",
-                version="1.2.3-1", upstream_version="1.2.3", source="https://x/r", released="2026-05-19T10:00:00Z",
+                version=kw.get("version", "1.2.3-1"), upstream_version="1.2.3", source="https://x/r",
+                released="2026-05-19T10:00:00Z",
                 arches={a: {"filename": "f", "size": 1, "md5": "", "sha1": "", "sha256": "",
                             "control": f"Package: {name}\nDescription: {kw.get('desc', 'Does things')}"}
-                        for a in ("amd64", "arm64")},
+                        for a in kw.get("arches", ("amd64", "arm64"))},
                 note=kw.get("note", ""),
             )
         return s
 
-    def page(self, state=None):
-        return site.render(state or self.state(), CFG, self.FP)
+    def export(self, state=None, cfg=CFG, fp=FP, now=1_779_000_000):
+        return site.export(state or self.state(), cfg, fp, now=now)
 
-    def test_install_snippet_uses_config_and_fixed_paths(self):
-        page = self.page()
-        for text in (
-            f"sudo curl -fsSL {CFG.base_url}/key.gpg -o /etc/apt/keyrings/rafaelvieiras-apt.gpg",
-            "sudo tee /etc/apt/sources.list.d/rafaelvieiras-apt.sources",
-            "Types: deb", f"URIs: {CFG.base_url}/", f"Suites: {CFG.suite}", f"Components: {CFG.component}",
-            "Signed-By: /etc/apt/keyrings/rafaelvieiras-apt.gpg", "sudo apt update",
-        ):
-            self.assertIn(text, page)
+    def test_schema_and_repo_config(self):
+        data = self.export()
+        self.assertEqual(set(data), {"schema", "generated", "indexGenerated", "repo", "fingerprint", "packages"})
+        self.assertEqual(data["repo"]["baseUrl"], CFG.base_url)
+        self.assertEqual((data["repo"]["suite"], data["repo"]["component"]), ("stable", "main"))
+        self.assertEqual(data["repo"]["architectures"], ["amd64", "arm64"])
+        self.assertEqual(data["indexGenerated"], "2026-05-20T06:17:03Z")
+        self.assertEqual(json.loads(json.dumps(data)), data)
 
-    def test_fingerprint_and_packages_are_listed(self):
-        page = self.page()
-        self.assertIn("A1B2 C3D4 E5F6 0718 293A", page)
-        self.assertIn(f'data-copy="{self.FP}"', page)
-        for name in ("alpha", "beta"):
-            self.assertIn(f"sudo apt install {name}", page)
-        self.assertIn("1.2.3", page)
-        self.assertIn("Needs glibc 2.38 or newer.", page)
-        self.assertIn("2026-05-20 06:17 UTC", page)
-        self.assertNotIn("sudo apt install beta-runtime", page)  # transitional: listed, not a card
-        self.assertIn("beta-runtime", page)
+    def test_generated_is_a_real_utc_timestamp(self):
+        # Regression: the old page rendered an empty "Generated" because state["generated"] was unset.
+        state = repo.empty_state()
+        self.assertEqual(self.export(state, now=0)["generated"], "1970-01-01T00:00:00Z")
+        self.assertRegex(site.export(state, CFG, self.FP)["generated"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
 
-    def test_old_state_without_notes_renders(self):
+    def test_fingerprint_is_raw_and_pretty(self):
+        fp = self.export()["fingerprint"]
+        self.assertEqual(fp["raw"], self.FP)
+        self.assertEqual(fp["pretty"], "A1B2 C3D4 E5F6 0718 293A  4B5C 6D7E 8F90 1234 5678")
+        self.assertEqual(fp["pretty"].replace(" ", ""), self.FP)
+
+    def test_packages_are_sorted_with_newest_version(self):
+        state = self.state()
+        repo.add_version(
+            state, name="alpha", homepage="https://example.test/alpha", license="MIT", version="1.10.0-1",
+            upstream_version="1.10.0", source="s", released="2026-05-21T00:00:00Z",
+            arches={"amd64": {"control": "Description: Does things"}},
+        )
+        packages = self.export(state)["packages"]
+        self.assertEqual([p["name"] for p in packages], ["alpha", "beta", "beta-runtime"])
+        alpha = packages[0]
+        self.assertEqual((alpha["version"], alpha["debVersion"]), ("1.10.0", "1.10.0-1"))
+        self.assertEqual(alpha["arches"], ["amd64"])
+        self.assertEqual(alpha["released"], "2026-05-21T00:00:00Z")
+        self.assertEqual(packages[1]["arches"], ["amd64", "arm64"])
+        self.assertEqual(alpha["description"], "Does things")
+        self.assertEqual(alpha["license"], "MIT")
+        self.assertEqual(alpha["homepage"], "https://example.test/alpha")
+
+    def test_note_is_kept_and_optional(self):
+        packages = {p["name"]: p for p in self.export()["packages"]}
+        self.assertEqual(packages["alpha"]["note"], "Needs glibc 2.38 or newer.")
+        self.assertEqual(packages["beta"]["note"], "")
+
+    def test_old_state_without_notes_or_released_still_exports(self):
         state = self.state()
         for entry in state["packages"].values():
             entry.pop("note", None)
-        self.assertIn("sudo apt install alpha", self.page(state))
-        self.assertIn("No packages published yet", self.page(repo.empty_state()))
+            for info in entry["versions"].values():
+                info.pop("released", None)
+                info.pop("upstream_version", None)
+        packages = self.export(state)["packages"]
+        self.assertTrue(all(p["note"] == "" and p["released"] == "" for p in packages))
+        self.assertEqual(packages[0]["version"], "1.2.3-1")  # falls back to the Debian version
+        self.assertEqual(self.export(repo.empty_state())["packages"], [])
 
-    def test_hostile_values_are_escaped(self):
-        evil = '"><script>alert(1)</script>'
+    def test_transitional_detection(self):
+        packages = {p["name"]: p for p in self.export()["packages"]}
+        self.assertEqual({n: p["transitional"] for n, p in packages.items()},
+                         {"alpha": False, "beta": False, "beta-runtime": True})
+
+    def test_entries_without_versions_are_skipped(self):
+        state = self.state()
+        state["packages"]["ghost"] = {"versions": {}}
+        self.assertNotIn("ghost", [p["name"] for p in self.export(state)["packages"]])
+
+    def test_hostile_values_stay_valid_json_and_links_are_http_only(self):
+        evil = '"><script>alert(1)</script>\u2028\n\\'
         state = self.state(alpha={"homepage": "javascript:alert(1)", "note": evil, "desc": evil})
         cfg = repo.RepoConfig(**{**CFG.__dict__, "origin": evil, "description": evil})
-        page = site.render(state, cfg, "AB" + evil)
-        self.assertNotIn(evil, page)
-        self.assertEqual(page.count("<script>"), 1)  # only the copy-button script
-        self.assertNotIn("javascript:", page)
+        data = self.export(state, cfg, "AB" + evil)
+        text = json.dumps(data, ensure_ascii=False)
+        self.assertEqual(json.loads(text), data)
+        alpha = data["packages"][0]
+        self.assertEqual(alpha["homepage"], "")  # javascript: never reaches an href
+        self.assertEqual(alpha["note"], evil)  # escaping is the template's job (Astro does it)
 
-    def test_no_external_resources_and_small(self):
-        page = self.page()
-        self.assertFalse(re.search(r'<(?:script|img|iframe|source|audio|video)\b[^>]*\bsrc=', page))
-        self.assertFalse(re.search(r'<link\b[^>]*rel="(?:stylesheet|preload|prefetch|preconnect)"', page))
-        self.assertNotIn("@import", page)
-        self.assertNotRegex(page, r"url\(\s*['\"]?(?:https?:)?//")
-        self.assertLess(len(page.encode()), 60_000)
+    def test_write_data_round_trips_and_ends_with_newline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "deep" / "site-data.json"
+            data = self.export()
+            site.write_data(out, data)
+            self.assertEqual(json.loads(out.read_text()), data)
+            self.assertTrue(out.read_text().endswith("\n"))
 
-    def test_page_works_without_javascript(self):
-        page = self.page()
-        self.assertIn('lang="en"', page)
-        self.assertIn('class="skip"', page)
-        self.assertRegex(page, r'<button type="button" class="copy"[^>]* hidden')  # hidden until JS enables it
-        self.assertIn("<details>", page)
+    def test_export_from_storage_uses_the_real_key_and_needs_an_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            _, pub = make_key(tmp / "gnupg")
+            key = tmp / "pub.asc"
+            key.write_bytes(pub)
+            store = storage.DirStorage(tmp / "bucket")
+            out = tmp / "out.json"
+            with self.assertRaises(site.SiteError):
+                site.export_from_storage(store, CFG, key, out)
+            store.put("index.json", json.dumps(self.state()).encode())
+            data = site.export_from_storage(store, CFG, key, out)
+            self.assertEqual(data["fingerprint"]["raw"], sign.public_fingerprint(pub))
+            self.assertEqual(json.loads(out.read_text())["packages"][0]["name"], "alpha")
+
+
+class SiteUpload(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dist = Path(self.tmp.name) / "dist"
+        self.store = storage.DirStorage(Path(self.tmp.name) / "bucket")
+
+    def make(self, files):
+        for key, data in files.items():
+            path = self.dist / key
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+
+    def basic(self, **more):
+        self.make({"index.html": b"<h1>home", "packages.html": b"<h1>pkgs", "favicon.svg": b"<svg/>", **more})
+
+    def test_pages_get_an_extensionless_copy_with_html_content_type(self):
+        self.basic()
+        site.upload(self.store, self.dist, log=lambda *_: None)
+        self.assertEqual(self.store.get("packages"), b"<h1>pkgs")
+        self.assertEqual(self.store.get("packages.html"), b"<h1>pkgs")
+        self.assertEqual(self.store.types["packages"], "text/html; charset=utf-8")
+        self.assertEqual(self.store.types["packages.html"], "text/html; charset=utf-8")
+        self.assertEqual(self.store.types["index.html"], "text/html; charset=utf-8")
+        self.assertFalse(self.store.exists("index"), "the home page is served by the / rewrite only")
+
+    def test_any_other_html_page_gets_the_same_treatment(self):
+        self.basic(**{"about.html": b"about", "docs/guide.html": b"guide"})
+        site.upload(self.store, self.dist, log=lambda *_: None)
+        for key in ("about", "about.html", "docs/guide", "docs/guide.html"):
+            self.assertTrue(self.store.exists(key), key)
+            self.assertEqual(self.store.types[key], "text/html; charset=utf-8", key)
+
+    def test_cache_headers_and_content_types(self):
+        self.basic(**{"_astro/app.abc123.css": b"a{}", "_astro/app.abc123.js": b"1", "robots.txt": b"x"})
+        site.upload(self.store, self.dist, log=lambda *_: None)
+        h, t = self.store.headers, self.store.types
+        self.assertEqual(h["_astro/app.abc123.css"], storage.IMMUTABLE)
+        self.assertEqual(h["_astro/app.abc123.js"], storage.IMMUTABLE)
+        for key in ("index.html", "packages", "packages.html", "favicon.svg", "robots.txt"):
+            self.assertEqual(h[key], storage.SHORT, key)
+        self.assertEqual(t["_astro/app.abc123.css"], "text/css; charset=utf-8")
+        self.assertEqual(t["_astro/app.abc123.js"], "text/javascript; charset=utf-8")
+        self.assertEqual(t["favicon.svg"], "image/svg+xml")
+
+    def test_home_page_goes_last(self):
+        self.basic(**{"_astro/a.css": b"a{}"})
+        keys = site.upload(self.store, self.dist, log=lambda *_: None)
+        self.assertEqual(keys[-1], "index.html")
+        self.assertLess(keys.index("_astro/a.css"), keys.index("packages"))
+
+    def test_refuses_keys_that_could_shadow_apt_paths(self):
+        for bad in ("dists/stable/InRelease", "pool/main/x.deb", "key.gpg", "key.asc", "key.txt",
+                    "index.json", "dists/x.html", "pool.html", "dists.html", "Key.GPG", "INDEX.JSON"):
+            with self.subTest(bad):
+                shutil_rmtree(self.dist)
+                self.basic(**{bad: b"evil"})
+                store = storage.DirStorage(Path(self.tmp.name) / f"bucket-{abs(hash(bad))}")
+                with self.assertRaises(site.SiteError):
+                    site.upload(store, self.dist, log=lambda *_: None)
+                self.assertEqual(store.headers, {}, "nothing is uploaded when any key is refused")
+
+    def test_extensionless_copy_cannot_shadow_either(self):
+        # A page named key.html would also be stored as "key.html" (allowed) but its copy "key" is fine;
+        # index.json.html would create the extensionless copy "index.json", which must be refused.
+        self.basic(**{"index.json.html": b"evil"})
+        with self.assertRaises(site.SiteError):
+            site.upload(self.store, self.dist, log=lambda *_: None)
+
+    def test_requires_a_build_and_refuses_symlinks(self):
+        with self.assertRaises(site.SiteError):
+            site.upload(self.store, self.dist, log=lambda *_: None)
+        self.basic()
+        (self.dist / "link").symlink_to("/etc/passwd")
+        with self.assertRaises(site.SiteError):
+            site.upload(self.store, self.dist, log=lambda *_: None)
+
+
+def shutil_rmtree(path: Path) -> None:
+    import shutil
+    shutil.rmtree(path, ignore_errors=True)
+
+
+class SiteCli(unittest.TestCase):
+    def test_site_data_and_upload_site_commands(self):
+        import contextlib
+        from aptrepo import cli
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            tmp = Path(tmp)
+            _, pub = make_key(tmp / "gnupg")
+            (tmp / "pub.asc").write_bytes(pub)
+            (tmp / "repo.toml").write_text(
+                '[repository]\norigin="T"\narchitectures=["amd64"]\nbase_url="https://apt.example.test/"\n'
+                f'key_file="{tmp / "pub.asc"}"\n')
+            index = tmp / "index.json"
+            index.write_text(json.dumps(repo.empty_state()))
+            out = tmp / "data" / "site-data.json"
+            with mock.patch.object(cli, "ROOT", tmp):
+                code = cli.main(["site-data", "--config", str(tmp / "repo.toml"), "--index", str(index),
+                                 "--storage", f"dir:{tmp / 'b'}", "--out", str(out)])
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(out.read_text())["repo"]["baseUrl"], "https://apt.example.test")
+            dist = tmp / "dist"
+            dist.mkdir()
+            (dist / "index.html").write_text("home")
+            (dist / "packages.html").write_text("pkgs")
+            self.assertEqual(cli.main(["upload-site", str(dist), "--storage", f"dir:{tmp / 'b'}"]), 0)
+            self.assertEqual((tmp / "b" / "packages").read_text(), "pkgs")
+            (dist / "key.gpg").write_text("evil")
+            self.assertEqual(cli.main(["upload-site", str(dist), "--storage", f"dir:{tmp / 'b'}"]), 1)
+            self.assertFalse((tmp / "b" / "key.gpg").exists())
 
 
 class RecipeNote(unittest.TestCase):
@@ -513,7 +675,7 @@ class PublishFlow(unittest.TestCase):
         self.assertEqual(set(state["packages"]), {"tool", "tool-runtime"})
         self.assertEqual(state["packages"]["tool"]["note"], "Needs nothing.")
         self.assertNotIn("note", state["packages"]["tool-runtime"])
-        self.assertIn(b"Needs nothing.", self.store.get("index.html"))
+        self.assertFalse(self.store.exists("index.html"), "the site is published by its own step")
         self.assertTrue(self.store.exists("pool/main/t/tool/tool_1.0.0-1_amd64.deb"))
         self.assertTrue(self.store.exists("pool/main/t/tool-runtime/tool-runtime_1.0.0-1_amd64.deb"))
         self.assertEqual(self.store.headers["pool/main/t/tool/tool_1.0.0-1_amd64.deb"], storage.IMMUTABLE)

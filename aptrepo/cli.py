@@ -10,6 +10,7 @@ from pathlib import Path
 
 from . import publish as publisher
 from . import recipe, repo, storage, upstream
+from . import site as sitebuild
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -67,6 +68,38 @@ def cmd_publish(args: argparse.Namespace) -> int:
     return 1 if result.errors else 0
 
 
+def _export(args: argparse.Namespace, store: storage.Storage, cfg: repo.RepoConfig) -> Path:
+    out = Path(args.out)
+    data = sitebuild.export_from_storage(
+        store, cfg, ROOT / cfg.key_file, out, index=Path(args.index) if args.index else None
+    )
+    print(f"wrote {out} ({len(data['packages'])} packages)")
+    return out
+
+
+def cmd_site_data(args: argparse.Namespace) -> int:
+    """Write site-data.json (the Astro build input) from the published index.json."""
+    cfg = _config(args.config)
+    _export(args, storage.open_storage(args.storage), cfg)
+    return 0
+
+
+def cmd_upload_site(args: argparse.Namespace) -> int:
+    """Upload an already built site/dist/ (no Node needed)."""
+    sitebuild.upload(storage.open_storage(args.storage), Path(args.dist))
+    return 0
+
+
+def cmd_publish_site(args: argparse.Namespace) -> int:
+    """Export data, build the Astro site (npm ci && npm run build) and upload it."""
+    cfg = _config(args.config)
+    store = storage.open_storage(args.storage)
+    _export(args, store, cfg)
+    dist = sitebuild.build(ROOT / "site")
+    sitebuild.upload(store, dist)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="aptrepo", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -93,10 +126,31 @@ def main(argv: list[str] | None = None) -> int:
     p_pub.add_argument("--force-index", action="store_true", help="re-render and re-sign even if nothing changed")
     p_pub.set_defaults(func=cmd_publish)
 
+    default_out = str(ROOT / sitebuild.DATA_PATH)
+
+    def site_data_args(p: argparse.ArgumentParser) -> None:
+        p.add_argument("--storage", default="r2", help="'r2' or 'dir:PATH'; index.json is read from here")
+        p.add_argument("--config", default=str(ROOT / "repo.toml"))
+        p.add_argument("--index", help="read this local index.json instead of the storage")
+        p.add_argument("--out", default=default_out, help="where to write site-data.json")
+
+    p_data = sub.add_parser("site-data", help="export site-data.json for the Astro site")
+    site_data_args(p_data)
+    p_data.set_defaults(func=cmd_site_data)
+
+    p_up = sub.add_parser("upload-site", help="upload a built site/dist/ (refuses apt paths)")
+    p_up.add_argument("dist", help="build output, normally site/dist")
+    p_up.add_argument("--storage", default="r2", help="'r2' or 'dir:PATH'")
+    p_up.set_defaults(func=cmd_upload_site)
+
+    p_site = sub.add_parser("publish-site", help="export data, build the site with npm and upload it")
+    site_data_args(p_site)
+    p_site.set_defaults(func=cmd_publish_site)
+
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except (RuntimeError, ValueError, recipe.RecipeError, upstream.UpstreamError) as exc:
+    except (RuntimeError, ValueError, OSError, recipe.RecipeError, upstream.UpstreamError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
