@@ -94,8 +94,8 @@ def cmd_publish_site(args: argparse.Namespace) -> int:
     """Export data, build the Astro site (npm ci && npm run build) and upload it."""
     cfg = _config(args.config)
     store = storage.open_storage(args.storage)
-    _export(args, store, cfg)
-    dist = sitebuild.build(ROOT / "site")
+    out = _export(args, store, cfg)
+    dist = sitebuild.build(ROOT / "site", data=out)
     sitebuild.upload(store, dist)
     return 0
 

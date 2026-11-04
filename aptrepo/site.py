@@ -17,6 +17,7 @@ which is what the site links to (``/packages``).
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from datetime import datetime, timezone
@@ -174,13 +175,17 @@ def upload(storage: Storage, dist: Path, log=print) -> list[str]:
     return keys
 
 
-def build(site_dir: Path, log=print) -> Path:
-    """``npm ci && npm run build``. The only place Node is needed."""
+def build(site_dir: Path, data: Path | None = None, log=print) -> Path:
+    """``npm ci && npm run build``. The only place Node is needed.
+
+    ``data`` is handed to Astro as ``SITE_DATA``, so the build reads exactly the file just exported.
+    """
     site_dir = Path(site_dir)
+    env = dict(os.environ, **({"SITE_DATA": str(Path(data).resolve())} if data else {}))
     for cmd in (["npm", "ci"], ["npm", "run", "build"]):
         log("$ " + " ".join(cmd))
         try:
-            proc = subprocess.run(cmd, cwd=site_dir)
+            proc = subprocess.run(cmd, cwd=site_dir, env=env)
         except FileNotFoundError:
             raise SiteError("npm is required to build the site (Node 22.12+)") from None
         if proc.returncode != 0:

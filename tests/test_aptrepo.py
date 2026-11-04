@@ -568,6 +568,20 @@ class SiteUpload(unittest.TestCase):
             site.upload(self.store, self.dist, log=lambda *_: None)
         self.assertEqual(self.store.headers, {})
 
+    def test_build_passes_the_exported_file_to_astro(self):
+        calls = []
+        def fake_run(cmd, cwd=None, env=None):
+            calls.append((cmd, Path(cwd), env.get("SITE_DATA")))
+            return mock.Mock(returncode=0)
+        with mock.patch.object(site.subprocess, "run", fake_run):
+            dist = site.build(Path(self.tmp.name) / "site", data=Path(self.tmp.name) / "d.json", log=lambda *_: None)
+        self.assertEqual([c[0] for c in calls], [["npm", "ci"], ["npm", "run", "build"]])
+        self.assertTrue(all(c[2] == str(Path(self.tmp.name).resolve() / "d.json") for c in calls))
+        self.assertEqual(dist, Path(self.tmp.name) / "site" / "dist")
+        with mock.patch.object(site.subprocess, "run", side_effect=FileNotFoundError):
+            with self.assertRaises(site.SiteError):
+                site.build(Path(self.tmp.name), log=lambda *_: None)
+
     def test_requires_a_build_and_refuses_symlinks(self):
         with self.assertRaises(site.SiteError):
             site.upload(self.store, self.dist, log=lambda *_: None)
