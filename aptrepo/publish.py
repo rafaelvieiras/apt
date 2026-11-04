@@ -195,6 +195,7 @@ def publish(
                         source=f"https://github.com/{recipe.repo}/releases/tag/{release.tag}",
                         released=release.published,
                         arches=arches,
+                        note=recipe.note if pkg_name == recipe.name else "",
                     )
                 changed = True
                 result.published.append(recipe.name)
@@ -210,6 +211,9 @@ def publish(
         if not private_key:
             raise sign.SignError("no signing key: set APT_GPG_PRIVATE_KEY")
 
+        for recipe in recipes:  # notes live in the recipe: refresh them even when nothing new was built
+            if recipe.name in state["packages"]:
+                repo.set_note(state, recipe.name, recipe.note)
         doomed = repo.prune(state, cfg.retain)
         state["generated"] = datetime.fromtimestamp(now or _now(), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         rendered = repo.render_dists(state, cfg, now=now)

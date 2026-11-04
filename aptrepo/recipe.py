@@ -28,6 +28,7 @@ class Recipe:
     companions: tuple[dict, ...] = ()  # empty transitional packages that depend on this one
     files: tuple[dict, ...] = ()  # kind "files": which upstream file goes where
     extra_assets: tuple[str, ...] = ()  # kind "files": more arch-independent assets (man pages...)
+    note: str = ""  # one-line compatibility note shown on the landing page
 
 
 def _need(data: dict, key: str, where: str):
@@ -78,6 +79,7 @@ def parse_recipe(data: dict, where: str = "recipe") -> Recipe:
         name=name,
         license=str(_need(data, "license", where)),
         homepage=str(data.get("homepage", f"https://github.com/{repo}")),
+        note=str(data.get("note", "")).strip(),
         repo=repo,
         kind=kind,
         revision=int(build.get("revision", 1)),

@@ -96,10 +96,12 @@ def add_version(
     source: str,
     released: str,
     arches: dict[str, dict],
+    note: str = "",
 ) -> None:
     entry = state["packages"].setdefault(name, {"versions": {}})
     entry["homepage"] = homepage
     entry["license"] = license
+    set_note(state, name, note)
     entry["versions"][version] = {
         "upstream_version": upstream_version,
         "source": source,
@@ -108,6 +110,15 @@ def add_version(
     }
     first = next(iter(arches.values()))["control"]
     entry["description"] = _short_description(first)
+
+
+def set_note(state: dict, name: str, note: str) -> None:
+    """Landing-page compatibility note. Optional: old ``index.json`` files have none."""
+    entry = state["packages"][name]
+    if note:
+        entry["note"] = note
+    else:
+        entry.pop("note", None)
 
 
 def _short_description(control: str) -> str:

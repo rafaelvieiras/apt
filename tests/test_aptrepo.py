@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import subprocess
 import tarfile
 import tempfile
@@ -331,6 +332,25 @@ class ArchAll(unittest.TestCase):
             self.assertIn("tool_1-1_all.deb", repo.render_packages(s, arch).decode())
 
 
+class RecipeNote(unittest.TestCase):
+    def test_note_is_parsed_stored_and_optional(self):
+        base = {"name": "tool", "license": "MIT", "source": {"repo": "a/b"}, "build": {"kind": "deb"},
+                "assets": {"amd64": "t.deb"}}
+        self.assertEqual(recipe.parse_recipe(base).note, "")
+        self.assertEqual(recipe.parse_recipe({**base, "note": " Needs X. "}).note, "Needs X.")
+        state = repo.empty_state()
+        kw = dict(name="tool", homepage="h", license="MIT", version="1-1", upstream_version="1", source="s",
+                  released="r", arches={"amd64": {"control": "Description: d"}})
+        repo.add_version(state, note="Needs X.", **kw)
+        self.assertEqual(state["packages"]["tool"]["note"], "Needs X.")
+        repo.set_note(state, "tool", "")
+        self.assertNotIn("note", state["packages"]["tool"])
+
+    def test_every_shipped_recipe_note_is_short(self):
+        for r in recipe.load_recipes(ROOT / "packages"):
+            self.assertLess(len(r.note), 120, r.name)
+
+
 class PublishFlow(unittest.TestCase):
     """Full publish against a fake upstream and a directory bucket."""
 
@@ -343,7 +363,7 @@ class PublishFlow(unittest.TestCase):
         self.key_path.write_bytes(self.pub)
         (self.dir / "packages").mkdir()
         (self.dir / "packages" / "tool.toml").write_text(
-            'name="tool"\nlicense="MIT"\n[source]\nrepo="a/b"\n[build]\nkind="tarball"\nlicense_path="L"\n'
+            'name="tool"\nlicense="MIT"\nnote="Needs nothing."\n[source]\nrepo="a/b"\n[build]\nkind="tarball"\nlicense_path="L"\n'
             '[assets]\namd64="t.tgz"\n[package]\nsection="utils"\ndescription="Short\\nLong"\n'
             '[[companion]]\nname="tool-runtime"\ndescription="Transitional\\nEmpty"\n'
         )
@@ -379,6 +399,8 @@ class PublishFlow(unittest.TestCase):
         sign.verify_clearsigned(self.pub, self.store.get("dists/stable/InRelease"))
         state = json.loads(self.store.get("index.json"))
         self.assertEqual(set(state["packages"]), {"tool", "tool-runtime"})
+        self.assertEqual(state["packages"]["tool"]["note"], "Needs nothing.")
+        self.assertNotIn("note", state["packages"]["tool-runtime"])
         self.assertTrue(self.store.exists("pool/main/t/tool/tool_1.0.0-1_amd64.deb"))
         self.assertTrue(self.store.exists("pool/main/t/tool-runtime/tool-runtime_1.0.0-1_amd64.deb"))
         self.assertEqual(self.store.headers["pool/main/t/tool/tool_1.0.0-1_amd64.deb"], storage.IMMUTABLE)

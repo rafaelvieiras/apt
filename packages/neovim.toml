@@ -1,6 +1,7 @@
 name = "neovim"
 license = "Apache-2.0 AND Vim"
 homepage = "https://neovim.io"
+note = "Needs glibc 2.34 or newer: Debian 12+ and Ubuntu 22.04+."
 
 [source]
 type = "github-release"

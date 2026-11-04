@@ -1,6 +1,7 @@
 name = "ripgrep"
 license = "MIT OR Unlicense"
 homepage = "https://github.com/BurntSushi/ripgrep"
+note = "Static (musl) build: runs on every Debian and Ubuntu release."
 
 [source]
 type = "github-release"

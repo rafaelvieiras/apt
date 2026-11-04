@@ -2,6 +2,7 @@ name = "ghostty"
 # Ghostty's own licence. The .deb comes from a community build, see below.
 license = "MIT"
 homepage = "https://ghostty.org"
+note = "Needs glibc 2.38 or newer: Ubuntu 24.04+ and Debian 13+ (not Debian 12 or Ubuntu 22.04)."
 
 # Ghostty publishes no Linux binaries. mkasberg/ghostty-ubuntu is the community
 # project that builds .debs from the official source; it is what the PPA uses.

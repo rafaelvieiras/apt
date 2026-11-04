@@ -8,6 +8,7 @@ Create `packages/<name>.toml`. The file name must equal `name`.
 name = "yazi"
 license = "MIT"                 # SPDX; must be on the allowlist in aptrepo/licenses.py
 homepage = "https://yazi-rs.github.io"
+note = "Static (musl) build: runs on every Debian and Ubuntu release."   # optional, shown on the landing page
 
 [source]
 type = "github-release"
