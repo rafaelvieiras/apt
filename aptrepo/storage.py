@@ -26,41 +26,58 @@ def cache_control(key: str) -> str:
     The few mutable entry points (Release, InRelease, index.json, ...) cache for
     five minutes, which is enough to absorb traffic and still lets updates land.
     """
-    if key.startswith("pool/") or "/by-hash/" in key:
-        return IMMUTABLE
+    if key.startswith(("pool/", "_astro/")) or "/by-hash/" in key:
+        return IMMUTABLE  # _astro/ holds the landing page's content-hashed assets
     return SHORT
+
+
+HTML = "text/html; charset=utf-8"
+
+# Explicit, so the answer does not depend on the machine's mime database.
+_TYPES = {
+    ".asc": "text/plain; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+    ".deb": "application/vnd.debian.binary-package",
+    ".gz": "application/octet-stream",
+    ".xz": "application/octet-stream",
+    ".json": "application/json",
+    ".html": HTML,
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".xml": "application/xml; charset=utf-8",
+    ".webmanifest": "application/manifest+json",
+}
 
 
 def content_type(key: str) -> str:
     name = key.rsplit("/", 1)[-1]
-    if name in ("Release", "InRelease", "Packages", "Release.gpg") or key.endswith(".asc"):
+    if name in ("Release", "InRelease", "Packages", "Release.gpg"):
         return "text/plain; charset=utf-8"
-    if key.endswith(".deb"):
-        return "application/vnd.debian.binary-package"
-    if key.endswith((".gz", ".xz")):
-        return "application/octet-stream"
-    if key.endswith(".json"):
-        return "application/json"
-    if key.endswith(".html"):
-        return "text/html; charset=utf-8"
+    dot = name.rfind(".")
+    if dot > 0 and name[dot:].lower() in _TYPES:
+        return _TYPES[name[dot:].lower()]
     return mimetypes.guess_type(name)[0] or "application/octet-stream"
 
 
 class Storage(Protocol):
     def get(self, key: str) -> bytes | None: ...
-    def put(self, key: str, data: bytes) -> None: ...
-    def put_file(self, key: str, path: Path) -> None: ...
+    def put(self, key: str, data: bytes, ctype: str | None = None) -> None: ...
+    def put_file(self, key: str, path: Path, ctype: str | None = None) -> None: ...
     def delete(self, key: str) -> None: ...
     def exists(self, key: str) -> bool: ...
 
 
 class DirStorage:
-    """Plain directory. ``headers`` records the cache policy so tests can assert it."""
+    """Plain directory. ``headers`` and ``types`` record what a real bucket would be told."""
 
     def __init__(self, root: Path):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.headers: dict[str, str] = {}
+        self.types: dict[str, str] = {}
 
     def _path(self, key: str) -> Path:
         path = (self.root / key).resolve()
@@ -72,19 +89,21 @@ class DirStorage:
         path = self._path(key)
         return path.read_bytes() if path.is_file() else None
 
-    def put(self, key: str, data: bytes) -> None:
+    def put(self, key: str, data: bytes, ctype: str | None = None) -> None:
         path = self._path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(path.name + ".part")
         tmp.write_bytes(data)
         tmp.replace(path)
         self.headers[key] = cache_control(key)
+        self.types[key] = ctype or content_type(key)
 
-    def put_file(self, key: str, path: Path) -> None:
+    def put_file(self, key: str, path: Path, ctype: str | None = None) -> None:
         dest = self._path(key)
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, dest)
         self.headers[key] = cache_control(key)
+        self.types[key] = ctype or content_type(key)
 
     def delete(self, key: str) -> None:
         self._path(key).unlink(missing_ok=True)
@@ -134,19 +153,19 @@ class R2Storage:
                 raise RuntimeError(f"get {key}: {proc.stderr.decode(errors='replace').strip()}")
             return dest.read_bytes()
 
-    def put_file(self, key: str, path: Path) -> None:
+    def put_file(self, key: str, path: Path, ctype: str | None = None) -> None:
         self._aws(
             [
                 "s3api", "put-object", "--bucket", self.bucket, "--key", key, "--body", str(path),
-                "--cache-control", cache_control(key), "--content-type", content_type(key),
+                "--cache-control", cache_control(key), "--content-type", ctype or content_type(key),
             ]
         )
 
-    def put(self, key: str, data: bytes) -> None:
+    def put(self, key: str, data: bytes, ctype: str | None = None) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "obj"
             path.write_bytes(data)
-            self.put_file(key, path)
+            self.put_file(key, path, ctype)
 
     def delete(self, key: str) -> None:
         self._aws(["s3api", "delete-object", "--bucket", self.bucket, "--key", key])

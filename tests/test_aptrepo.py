@@ -141,6 +141,39 @@ class CachePolicy(unittest.TestCase):
                     "dists/stable/main/binary-amd64/Packages.xz", "key.gpg", "index.html"):
             self.assertEqual(storage.cache_control(key), storage.SHORT, key)
 
+    def test_site_assets_are_immutable_pages_are_short(self):
+        self.assertEqual(storage.cache_control("_astro/index.3f9a1c.css"), storage.IMMUTABLE)
+        self.assertEqual(storage.cache_control("_astro/behavior.8b2d.js"), storage.IMMUTABLE)
+        for key in ("index.html", "packages", "packages.html", "robots.txt", "favicon.svg", "favicon.ico"):
+            self.assertEqual(storage.cache_control(key), storage.SHORT, key)
+
+    def test_content_types_do_not_depend_on_the_machine(self):
+        expected = {
+            "index.html": "text/html; charset=utf-8",
+            "packages.html": "text/html; charset=utf-8",
+            "_astro/a.css": "text/css; charset=utf-8",
+            "_astro/a.js": "text/javascript; charset=utf-8",
+            "favicon.svg": "image/svg+xml",
+            "favicon.ico": "image/x-icon",
+            "robots.txt": "text/plain; charset=utf-8",
+            "index.json": "application/json",
+            "key.asc": "text/plain; charset=utf-8",
+            "dists/stable/InRelease": "text/plain; charset=utf-8",
+            "pool/main/t/tool/tool_1_amd64.deb": "application/vnd.debian.binary-package",
+            "dists/stable/main/binary-amd64/Packages.xz": "application/octet-stream",
+            "something.unknown": "application/octet-stream",
+        }
+        for key, ctype in expected.items():
+            self.assertEqual(storage.content_type(key), ctype, key)
+
+    def test_dir_storage_records_explicit_content_type(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = storage.DirStorage(Path(tmp))
+            store.put("packages", b"<html>", "text/html; charset=utf-8")
+            store.put("other", b"x")
+            self.assertEqual(store.types["packages"], "text/html; charset=utf-8")
+            self.assertEqual(store.types["other"], "application/octet-stream")
+
     def test_dir_storage_blocks_escape(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(ValueError):
