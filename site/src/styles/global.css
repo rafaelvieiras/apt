@@ -1,0 +1,60 @@
+/* Design tokens, base styles and the few shared patterns. Component-specific CSS is scoped in its component. */
+:root {
+  color-scheme: light dark;
+  --bg: #fbfbfa; --bg2: #f2f4f3; --card: #fff; --fg: #14201f; --mut: #52605f; --line: #dfe4e2;
+  --acc: #0f766e; --acc-fg: #fff; --acc-soft: #e0f2ef; --glow: rgba(15,118,110,.16); --glow2: rgba(99,102,241,.10);
+  --term: #0d1618; --term-fg: #e4eceb; --term-mut: #8ea3a1; --term-line: #22343a; --term-acc: #5eead4;
+  --shadow: 0 1px 2px rgba(20,32,31,.05), 0 8px 24px -12px rgba(20,32,31,.18);
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a1112; --bg2: #0f1819; --card: #121d1e; --fg: #e6eeed; --mut: #9aaaa8; --line: #223133;
+    --acc: #5eead4; --acc-fg: #032420; --acc-soft: #133533; --glow: rgba(94,234,212,.10); --glow2: rgba(129,140,248,.10);
+    --term: #070d0e; --term-line: #1f2e31;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 1rem; -webkit-text-size-adjust: 100%; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--acc); text-underline-offset: .2em; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 3px solid var(--acc); outline-offset: 3px; border-radius: 4px; }
+code, pre { font-family: var(--mono); }
+h1, h2, h3 { line-height: 1.15; margin: 0; letter-spacing: -.02em; }
+p { margin: 0; }
+.wrap { max-width: 72rem; margin: 0 auto; padding: 0 1.25rem; }
+.mut { color: var(--mut); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+section { padding: 4.5rem 0; }
+section.alt { background: var(--bg2); border-block: 1px solid var(--line); }
+@media (max-width: 40rem) { section { padding: 3.25rem 0; } }
+.eyebrow { font-size: .8rem; text-transform: uppercase; letter-spacing: .12em; color: var(--acc); font-weight: 700; margin-bottom: .6rem; }
+h2 { font-size: clamp(1.65rem, 4vw, 2.3rem); font-weight: 800; }
+.sub { color: var(--mut); max-width: 40rem; margin-top: .8rem; font-size: 1.05rem; }
+.head { margin-bottom: 2.25rem; }
+p code, li code, dd code, summary code, .sub code {
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 5px; padding: 0 .3rem; font-size: .85em; color: var(--fg);
+}
+section.alt p code, section.alt li code, section.alt .sub code { background: var(--card); }
+
+.btn { display: inline-flex; align-items: center; gap: .5rem; padding: .7rem 1.2rem; border-radius: 10px; font-weight: 600; text-decoration: none;
+  border: 1px solid var(--line); color: var(--fg); background: var(--card); transition: transform .15s, box-shadow .15s; }
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn.primary { background: var(--acc); color: var(--acc-fg); border-color: var(--acc); }
+
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1.4rem;
+  transition: border-color .15s, box-shadow .15s, transform .15s; }
+.card:hover, .card:focus-within { border-color: var(--acc); box-shadow: var(--shadow); transform: translateY(-2px); }
+
+.tags { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; margin: 0; padding: 0; }
+.tags li { font-size: .75rem; padding: .12rem .55rem; border-radius: 999px; border: 1px solid var(--line); background: var(--bg2); color: var(--mut); }
+.tags li.arch { font-family: var(--mono); }
+.note { font-size: .85rem; color: var(--fg); background: var(--acc-soft); border-radius: 9px; padding: .5rem .7rem; }

@@ -1,0 +1,25 @@
+---
+import { data, repo, SOURCE_URL, stamp } from "../lib/site";
+---
+<footer>
+  <div class="wrap">
+    <div>
+      <b>{repo.name}</b><br />
+      Generated <time datetime={data.generated}>{stamp(data.generated)}</time>
+    </div>
+    <ul>
+      <li><a href="/packages">Packages</a></li>
+      <li><a href={SOURCE_URL}>Source on GitHub</a></li>
+      <li><a href={`${SOURCE_URL}/blob/main/LICENSE`}>MIT licence</a></li>
+      <li><a href={`${repo.baseUrl}/index.json`}>index.json</a></li>
+    </ul>
+    <p>Packaged software keeps its own licence.</p>
+  </div>
+</footer>
+
+<style>
+  footer { border-top: 1px solid var(--line); padding: 2.5rem 0 3rem; color: var(--mut); font-size: .9rem; }
+  .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem 2rem; }
+  b { color: var(--fg); }
+  ul { display: flex; flex-wrap: wrap; gap: .4rem 1.25rem; list-style: none; margin: 0; padding: 0; }
+</style>

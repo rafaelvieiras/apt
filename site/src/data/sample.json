@@ -1,0 +1,143 @@
+{
+ "schema": 1,
+ "sample": true,
+ "generated": "2026-04-01T12:00:03Z",
+ "indexGenerated": "2026-04-01T12:00:03Z",
+ "repo": {
+  "name": "rafaelvieiras apt",
+  "description": "Current builds of developer tools that Debian and Ubuntu package late or not at all.",
+  "baseUrl": "https://apt.rafaelvieiras.com",
+  "suite": "stable",
+  "component": "main",
+  "architectures": [
+   "amd64",
+   "arm64"
+  ],
+  "retain": 3
+ },
+ "fingerprint": {
+  "raw": "D7A3DA0BEA6E67AFADA5C504675F04D1172008F5",
+  "pretty": "D7A3 DA0B EA6E 67AF ADA5  C504 675F 04D1 1720 08F5"
+ },
+ "packages": [
+  {
+   "name": "fzf",
+   "version": "0.60.3",
+   "debVersion": "0.60.3-1",
+   "released": "2026-04-01T10:00:00Z",
+   "arches": [
+    "amd64",
+    "arm64"
+   ],
+   "license": "MIT",
+   "homepage": "https://github.com/junegunn/fzf",
+   "description": "General-purpose command-line fuzzy finder",
+   "note": "",
+   "transitional": false
+  },
+  {
+   "name": "ghostty",
+   "version": "1.2.3",
+   "debVersion": "1.2.3-1",
+   "released": "2026-04-01T10:00:00Z",
+   "arches": [
+    "amd64",
+    "arm64"
+   ],
+   "license": "MIT",
+   "homepage": "https://ghostty.org",
+   "description": "Fast, feature-rich, GPU-accelerated terminal emulator",
+   "note": "Needs glibc 2.38 or newer: Ubuntu 24.04+ and Debian 13+ (not Debian 12 or Ubuntu 22.04).",
+   "transitional": false
+  },
+  {
+   "name": "neovim",
+   "version": "0.11.4",
+   "debVersion": "0.11.4-1",
+   "released": "2026-04-01T10:00:00Z",
+   "arches": [
+    "amd64",
+    "arm64"
+   ],
+   "license": "Apache-2.0 AND Vim",
+   "homepage": "https://neovim.io",
+   "description": "Vim-fork focused on extensibility and usability",
+   "note": "Needs glibc 2.34 or newer: Debian 12+ and Ubuntu 22.04+.",
+   "transitional": false
+  },
+  {
+   "name": "neovim-runtime",
+   "version": "0.11.4",
+   "debVersion": "0.11.4-1",
+   "released": "2026-04-01T10:00:00Z",
+   "arches": [
+    "amd64",
+    "arm64"
+   ],
+   "license": "Apache-2.0 AND Vim",
+   "homepage": "https://neovim.io",
+   "description": "Transitional package for neovim",
+   "note": "",
+   "transitional": true
+  },
+  {
+   "name": "ripgrep",
+   "version": "15.1.0",
+   "debVersion": "15.1.0-1",
+   "released": "2026-04-01T10:00:00Z",
+   "arches": [
+    "amd64",
+    "arm64"
+   ],
+   "license": "MIT OR Unlicense",
+   "homepage": "https://github.com/BurntSushi/ripgrep",
+   "description": "Recursively search directories for a regex pattern",
+   "note": "Static (musl) build: runs on every Debian and Ubuntu release.",
+   "transitional": false
+  },
+  {
+   "name": "yazi",
+   "version": "26.1.22",
+   "debVersion": "26.1.22-1",
+   "released": "2026-04-01T10:00:00Z",
+   "arches": [
+    "amd64",
+    "arm64"
+   ],
+   "license": "MIT",
+   "homepage": "https://yazi-rs.github.io",
+   "description": "Blazing fast terminal file manager",
+   "note": "Static (musl) build: runs on every Debian and Ubuntu release.",
+   "transitional": false
+  },
+  {
+   "name": "yt-dlp",
+   "version": "2026.03.17",
+   "debVersion": "2026.03.17-1",
+   "released": "2026-04-01T10:00:00Z",
+   "arches": [
+    "all"
+   ],
+   "license": "Unlicense",
+   "homepage": "https://github.com/yt-dlp/yt-dlp",
+   "description": "Download videos from YouTube and many other sites",
+   "note": "Needs Python 3.11 or newer: Debian 12+, Ubuntu 24.04+ (not Ubuntu 22.04).",
+   "transitional": false
+  },
+  {
+   "name": "zoxide",
+   "version": "0.9.8",
+   "debVersion": "0.9.8-1",
+   "released": "2026-04-01T10:00:00Z",
+   "arches": [
+    "amd64",
+    "arm64"
+   ],
+   "license": "MIT",
+   "homepage": "https://github.com/ajeetdsouza/zoxide",
+   "description": "Smarter cd command that learns your habits",
+   "note": "Static (musl) build: runs on every Debian and Ubuntu release.",
+   "transitional": false
+  }
+ ]
+}

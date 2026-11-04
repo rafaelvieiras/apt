@@ -1,0 +1,53 @@
+---
+import "../styles/global.css";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import { isSample, repo } from "../lib/site";
+
+interface Props {
+  title: string;
+  description?: string;
+  path?: string; // canonical path, e.g. "/packages"
+  current?: "packages";
+}
+const { title, description = repo.description, path = "/", current } = Astro.props;
+const canonical = `${repo.baseUrl}${path === "/" ? "/" : path}`;
+// Inline favicon: no extra request, nothing to cache.
+const favicon =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f766e'/%3E%3Cpath d='M9 11l6 5-6 5M17 22h7' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {isSample && <meta name="site-data" content="sample" />}
+    {isSample && <meta name="robots" content="noindex" />}
+    <link rel="canonical" href={canonical} />
+    <meta name="theme-color" content="#fbfbfa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a1112" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+    <link rel="icon" href={favicon} />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <slot name="top"><div class="wrap"><Nav current={current} /></div></slot>
+    <main id="main"><slot /></main>
+    <Footer />
+    <div id="live" class="sr" role="status" aria-live="polite"></div>
+    <script>
+      import "../scripts/behavior.js";
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  .skip { position: absolute; left: -999px; top: .5rem; background: var(--acc); color: var(--acc-fg); padding: .5rem .9rem; border-radius: 6px; z-index: 10; }
+  .skip:focus { left: .5rem; }
+</style>

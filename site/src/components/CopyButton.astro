@@ -1,0 +1,20 @@
+---
+// Hidden until the script runs: without JavaScript there is nothing to click, and the text stays selectable.
+interface Props {
+  text: string;
+  label: string; // accessible name, e.g. "Copy install command for neovim"
+  tone?: "dark" | "light";
+}
+const { text, label, tone = "dark" } = Astro.props;
+---
+<button type="button" class:list={["copy", tone]} hidden data-copy={text} aria-label={label}>Copy</button>
+
+<style>
+  .copy { font: inherit; font-size: .78rem; cursor: pointer; border-radius: 7px; padding: .2rem .65rem; background: transparent; flex: none; }
+  .copy[hidden] { display: none; }
+  .dark { color: var(--term-fg); border: 1px solid var(--term-line); }
+  .dark:hover { background: #1a2a2e; }
+  .dark:focus-visible { outline-color: var(--term-acc); }
+  .light { color: var(--fg); border: 1px solid var(--line); background: var(--card); }
+  .light:hover { background: var(--bg2); }
+</style>

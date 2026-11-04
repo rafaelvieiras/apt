@@ -1,0 +1,71 @@
+---
+import Layout from "../layouts/Layout.astro";
+import PackageRow from "../components/PackageRow.astro";
+import { data, packages, repo, transitional } from "../lib/site";
+
+const total = packages.length + transitional.length;
+---
+<Layout
+  title={`Packages · ${repo.name}`}
+  description={`All ${packages.length} packages in ${repo.name}: current versions, architectures, licences and compatibility notes.`}
+  path="/packages"
+  current="packages"
+>
+  <section class="page">
+    <div class="wrap">
+      <p class="eyebrow">Catalogue</p>
+      <h1>Packages</h1>
+      <p class="sub">
+        {packages.length} tools, each at its latest published version. The same data is available as{" "}
+        <a href={`${repo.baseUrl}/index.json`}><code>index.json</code></a>. Not set up yet?{" "}
+        Start with the <a href="/#install">install steps</a>.
+      </p>
+
+      <div class="filter" id="filter-box" hidden>
+        <label for="filter" class="sr">Filter packages</label>
+        <input id="filter" type="search" placeholder="Filter by name, licence or text" autocomplete="off" spellcheck="false" />
+        <p id="filter-count" class="count" role="status">{total} listed</p>
+      </div>
+
+      <ul class="list" data-group>
+        {packages.map((pkg) => <PackageRow pkg={pkg} />)}
+      </ul>
+      {packages.length === 0 && <p class="mut">No packages published yet.</p>}
+
+      <p id="filter-empty" class="empty" hidden>No package matches. Try a shorter word.</p>
+
+      {transitional.length > 0 && (
+        <div class="trans" data-group>
+          <h2>Transitional packages</h2>
+          <p class="mut">Empty on purpose. They exist so that upgrades from the distribution packages keep working, and you can remove them once the real package is installed.</p>
+          <ul class="list">
+            {transitional.map((pkg) => <PackageRow pkg={pkg} />)}
+          </ul>
+        </div>
+      )}
+
+      <p class="foot mut">
+        Versions are upstream versions. Newest {repo.retain} builds of each package stay available; run <code>apt policy &lt;name&gt;</code> to see
+        which one apt would install. Last built <time datetime={data.generated}>{data.generated.slice(0, 16).replace("T", " ")} UTC</time>.
+      </p>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .page { padding: 1.5rem 0 4.5rem; }
+  h1 { font-size: clamp(2rem, 5vw, 2.8rem); font-weight: 800; letter-spacing: -.03em; margin-bottom: .2rem; }
+  .sub { max-width: 44rem; margin-bottom: 1.5rem; }
+  .filter { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: 1rem; }
+  .filter[hidden] { display: none; }
+  input { flex: 1 1 16rem; max-width: 26rem; font: inherit; padding: .6rem .9rem; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--fg); }
+  input:focus-visible { outline: 3px solid var(--acc); outline-offset: 2px; }
+  .count { color: var(--mut); font-size: .9rem; margin: 0; }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+  .list[hidden], .trans[hidden], .empty[hidden] { display: none; }
+  .empty { margin-top: 1rem; color: var(--mut); }
+  .trans { margin-top: 2.5rem; display: grid; gap: .6rem; }
+  .trans h2 { font-size: 1.15rem; letter-spacing: -.01em; color: var(--mut); }
+  .trans .mut { font-size: .9rem; margin-bottom: .4rem; }
+  .foot { margin-top: 2rem; font-size: .88rem; }
+</style>

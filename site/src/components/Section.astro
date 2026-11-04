@@ -1,0 +1,20 @@
+---
+interface Props {
+  id: string;
+  eyebrow: string;
+  title: string;
+  alt?: boolean;
+}
+const { id, eyebrow, title, alt = false } = Astro.props;
+const hasSub = Astro.slots.has("sub");
+---
+<section id={id} class:list={{ alt }} aria-labelledby={`${id}-title`}>
+  <div class="wrap">
+    <div class="head">
+      <p class="eyebrow">{eyebrow}</p>
+      <h2 id={`${id}-title`}>{title}</h2>
+      {hasSub && <p class="sub"><slot name="sub" /></p>}
+    </div>
+    <slot />
+  </div>
+</section>

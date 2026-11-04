@@ -1,0 +1,58 @@
+---
+import CopyButton from "./CopyButton.astro";
+import { day, type Pkg } from "../lib/site";
+
+interface Props {
+  pkg: Pkg;
+}
+const { pkg } = Astro.props;
+const released = day(pkg.released);
+const command = `sudo apt install ${pkg.name}`;
+// Lower-cased once at build time; the filter script only does substring checks.
+const search = [pkg.name, pkg.description, pkg.note, pkg.license, pkg.arches.join(" "), pkg.transitional ? "transitional" : ""]
+  .join(" ")
+  .toLowerCase();
+---
+<li class:list={["row", { muted: pkg.transitional }]} id={pkg.name} data-row data-search={search}>
+  <div class="id">
+    <h3>{pkg.homepage ? <a href={pkg.homepage}>{pkg.name}</a> : pkg.name}</h3>
+    <p class="ver" title={released ? `Released ${released}` : undefined}>v{pkg.version}</p>
+  </div>
+  <div class="about">
+    <p class="desc">{pkg.description}</p>
+    {pkg.note && <p class="note">{pkg.note}</p>}
+    <ul class="tags" aria-label="Architectures and licence">
+      {pkg.arches.map((arch) => <li class="arch">{arch}</li>)}
+      {pkg.license && <li>{pkg.license}</li>}
+    </ul>
+  </div>
+  <div class="cmd">
+    <code>{command}</code>
+    <CopyButton text={command} label={`Copy install command for ${pkg.name}`} />
+  </div>
+</li>
+
+<style>
+  .row { display: grid; gap: .5rem 1.25rem; padding: 1rem 1.1rem; background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    grid-template-columns: minmax(0, 1fr); scroll-margin-top: 1rem; }
+  .row:target { border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+  .row[hidden] { display: none; }
+  @media (min-width: 52rem) {
+    .row { grid-template-columns: 9.5rem minmax(0, 1fr) 17rem; align-items: start; }
+    .cmd { align-self: center; }
+  }
+  .id { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .6rem; }
+  @media (min-width: 52rem) { .id { display: block; } }
+  h3 { margin: 0; font-size: 1.1rem; overflow-wrap: anywhere; }
+  h3 a { color: var(--fg); text-decoration: none; }
+  h3 a:hover { color: var(--acc); text-decoration: underline; }
+  .ver { font: .82rem var(--mono); color: var(--mut); margin: 0; }
+  .about { display: grid; gap: .45rem; min-width: 0; }
+  .desc { color: var(--fg); }
+  .note { color: var(--mut); font-size: .85rem; padding-left: .7rem; border-left: 3px solid var(--acc); }
+  .cmd { display: flex; align-items: center; gap: .5rem; background: var(--term); color: var(--term-fg); border-radius: 9px; padding: .3rem .4rem .3rem .8rem; min-width: 0; }
+  .cmd code { flex: 1; min-width: 0; font-size: .8rem; padding: .25rem 0; overflow-wrap: anywhere; background: none; border: 0; color: inherit; }
+  .muted { background: transparent; border-style: dashed; }
+  .muted h3 a, .muted h3, .muted .desc { color: var(--mut); }
+  .muted .cmd { background: transparent; color: var(--mut); border: 1px solid var(--line); }
+</style>

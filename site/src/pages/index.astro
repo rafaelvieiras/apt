@@ -1,0 +1,236 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Section from "../components/Section.astro";
+import Icon from "../components/Icon.astro";
+import Terminal from "../components/Terminal.astro";
+import Command from "../components/Command.astro";
+import CopyButton from "../components/CopyButton.astro";
+import { CHECK_HOURS, SOURCE_URL, SOURCES, featured, install, packages, repo, data } from "../lib/site";
+
+const cmd = install();
+const count = packages.length;
+const arches = repo.architectures.join(", ");
+const why = [
+  ["clock", "Current, not frozen", `A bot checks every upstream project every ${CHECK_HOURS} hours and publishes new releases by itself. No waiting for the next distribution release.`],
+  ["layers", "One suite, every release", "Static or portable builds, so the same repository serves Debian and Ubuntu, old and new. Packages that need more say so."],
+  ["shield", "Signed, and you can check it", "Every index is signed with GPG. Compare the fingerprint below with the key apt will use before you trust it."],
+  ["nobody", "No account, no tracking", "Plain static files over HTTPS. No sign-up, no cookies, no analytics, and nothing on this site calls another server."],
+  ["code", "Open and repeatable", "Recipes and builder are public. Packages come from upstream's own releases, checksummed, and tarball builds are reproducible."],
+] as const;
+const flow = [
+  ["Upstream release", "A project publishes a release on GitHub. Nothing is patched."],
+  ["Build and sign", `GitHub Actions, every ${CHECK_HOURS} hours: verify checksums, check the licence, build the .deb, sign the index with GPG.`],
+  ["Store", "Static files in a Cloudflare R2 bucket. Old versions are pruned; a published package never changes."],
+  ["Serve", "Cloudflare CDN over HTTPS. apt only needs plain GET requests."],
+];
+---
+<Layout title={`${repo.name}: current developer tools for Debian and Ubuntu`} description={repo.description}>
+  <div class="hero" slot="top">
+    <div class="wrap">
+      <Nav />
+      <div class="hero-grid">
+        <div>
+          <span class="pill"><i></i>Signed · static · free</span>
+          <h1>Current tools for <em>Debian</em> and <em>Ubuntu</em></h1>
+          <p class="lead">The latest releases of developer tools that your distribution ships late or not at all. One GPG-signed repository, served as plain static files. No account, no cost.</p>
+          <div class="cta">
+            <a class="btn primary" href="#install">Add the repository</a>
+            <a class="btn" href="/packages">Browse {count} packages</a>
+          </div>
+          <ul class="stats">
+            <li><b>{count}</b><span>packages</span></li>
+            <li><b>{repo.architectures.length}</b><span>architectures</span></li>
+            <li><b>{CHECK_HOURS} h</b><span>update check</span></li>
+          </ul>
+        </div>
+        <Terminal title="bash" code={cmd.all} label="Copy the complete install snippet" />
+      </div>
+    </div>
+  </div>
+
+  <Section id="why" eyebrow="Why this repository" title="Boring infrastructure, fresh software">
+    <p slot="sub">Debian and Ubuntu freeze versions for years. This repository does not.</p>
+    <div class="grid why">
+      {why.map(([icon, title, text]) => (
+        <div class="card"><Icon name={icon} /><h3>{title}</h3><p>{text}</p></div>
+      ))}
+    </div>
+  </Section>
+
+  <Section id="install" eyebrow="Install" title="Three steps, about a minute" alt>
+    <p slot="sub">Run these as a normal user; they call <code>sudo</code> where needed. Works on current Debian and Ubuntu releases.</p>
+    <ol class="steps">
+      <li>
+        <div>
+          <h3>Add the signing key</h3>
+          <p>apt checks every download against this key. It lives in its own keyring file, so it is trusted for this repository only.</p>
+        </div>
+        <Terminal title="1. key" code={cmd.key} label="Copy the key commands" />
+      </li>
+      <li>
+        <div>
+          <h3>Add the source</h3>
+          <p>A small DEB822 file that tells apt where to look and which key to trust.</p>
+          <dl>
+            <dt>URIs</dt> <dd>where the repository lives.</dd>
+            <dt>Suites</dt> <dd><code>{repo.suite}</code>, the only suite. It serves every release.</dd>
+            <dt>Components</dt> <dd><code>{repo.component}</code>.</dd>
+            <dt>Signed-By</dt> <dd>pins the key from step 1 to this source.</dd>
+          </dl>
+        </div>
+        <Terminal title={SOURCES.split("/").pop() ?? "sources"} code={cmd.source} label="Copy the sources file command" />
+      </li>
+      <li>
+        <div>
+          <h3>Update and install</h3>
+          <p>Install anything from the <a href="/packages">package list</a>. From then on it upgrades together with the rest of your system.</p>
+        </div>
+        <Terminal title="3. install" code={cmd.update} label="Copy the update and install commands" />
+      </li>
+    </ol>
+  </Section>
+
+  <Section id="featured" eyebrow="Packages" title={`${count} tools, current today`}>
+    <p slot="sub">A taste of what is in here. Every package has its version, architectures, licence and compatibility notes on the <a href="/packages">packages page</a>.</p>
+    <ul class="grid strip">
+      {featured.map((pkg) => (
+        <li class="card">
+          <h3><a href={`/packages#${pkg.name}`}>{pkg.name}</a> <span class="ver">v{pkg.version}</span></h3>
+          <p>{pkg.description}</p>
+        </li>
+      ))}
+    </ul>
+    <p class="more"><a class="btn" href="/packages">See all {count} packages <span aria-hidden="true">→</span></a></p>
+  </Section>
+
+  <Section id="systems" eyebrow="Compatibility" title="Supported systems" alt>
+    <p slot="sub">One suite serves everything. A package that needs a newer system says so, and apt refuses to install it where it would not run.</p>
+    <div class="os">
+      <div class="card"><h3>Distributions</h3><ul><li>Debian 12 and newer</li><li>Ubuntu 22.04 and newer (some tools need a newer one, see the notes)</li><li>Derivatives such as Linux Mint and Pop!_OS</li></ul></div>
+      <div class="card"><h3>Architectures</h3><ul><li><code>amd64</code>: PCs and most servers</li><li><code>arm64</code>: Raspberry Pi, ARM servers and laptops</li><li><code>all</code>: architecture-independent packages, such as a Python zipapp</li></ul></div>
+      <div class="card"><h3>Published here</h3><ul><li>Suite <code>{repo.suite}</code>, component <code>{repo.component}</code></li><li>Architectures: {arches}</li><li>The newest {repo.retain} versions of each package</li></ul></div>
+    </div>
+  </Section>
+
+  <Section id="trust" eyebrow="How it works" title="Static files you can verify">
+    <p slot="sub">No server runs code when you install. The repository is a folder of files, built in public and signed before upload.</p>
+    <div class="two">
+      <ol class="flow">
+        {flow.map(([title, text], i) => (
+          <li><span class="n" aria-hidden="true">{i + 1}</span><div><b>{title}</b><span>{text}</span></div></li>
+        ))}
+      </ol>
+      <div>
+        <h3>Signing key fingerprint</h3>
+        <p class="mut gap">After step 1, print the fingerprint of the key apt will use. It must match this one exactly.</p>
+        <div class="fp-row">
+          <p class="fp" aria-label="Signing key fingerprint">{data.fingerprint.pretty}</p>
+          <CopyButton tone="light" text={data.fingerprint.raw} label="Copy the fingerprint without spaces" />
+        </div>
+        <Terminal title="verify" code={cmd.verify} label="Copy the verify command" />
+        <p class="mut gap">This site and the key are served from the same host. To check the key independently, compare it with the copy in the <a href={`${SOURCE_URL}/blob/main/keys/rafaelvieiras-apt.asc`}>source repository</a>.</p>
+        <ul class="links">
+          <li><a href={SOURCE_URL}>Source code</a></li>
+          <li><a href={`${repo.baseUrl}/index.json`}><code>index.json</code></a></li>
+          <li><a href={`${repo.baseUrl}/key.asc`}><code>key.asc</code></a></li>
+          <li><a href={`${repo.baseUrl}/dists/${repo.suite}/InRelease`}><code>InRelease</code></a></li>
+        </ul>
+      </div>
+    </div>
+  </Section>
+
+  <Section id="faq" eyebrow="FAQ" title="Questions you may have" alt>
+    <div class="faq">
+      <details><summary>How do updates arrive?</summary><div>
+        <p>Every {CHECK_HOURS} hours a GitHub Actions job looks for new upstream releases, builds and signs what changed, and uploads it. On your side it is the usual routine: <code>sudo apt update &amp;&amp; sudo apt upgrade</code>.</p></div></details>
+      <details><summary>What if my distribution ships the same package?</summary><div>
+        <p>apt installs the highest version it can see. These packages usually carry the newer upstream version, so they win. To see which one apt would pick:</p>
+        <Command command={cmd.policy} label="Copy the apt policy command" />
+        <p>To keep the distribution version, pin it with a file in <code>/etc/apt/preferences.d/</code>.</p></div></details>
+      <details><summary>Where do the binaries come from?</summary><div>
+        <p>From each project's own GitHub release, checksummed and repackaged without changes. Ghostty is the exception: it publishes no Linux binaries, so its <code>.deb</code> comes from the community build <a href="https://github.com/mkasberg/ghostty-ubuntu">mkasberg/ghostty-ubuntu</a>.</p></div></details>
+      <details><summary>How do I remove the repository?</summary><div>
+        <p>Delete the source and the key, then refresh. Packages you already installed stay on your system; they just stop receiving updates.</p>
+        <Terminal title="bash" code={cmd.remove} label="Copy the remove commands" /></div></details>
+      <details><summary>Can I request a package?</summary><div>
+        <p>Yes. <a href={`${SOURCE_URL}/issues/new`}>Open an issue</a> with the upstream link. It needs GitHub releases with Linux builds and a licence that allows redistribution. Static builds are preferred.</p></div></details>
+      <details><summary>Does this site track me?</summary><div>
+        <p>No cookies, no analytics and no external requests. Like any website, the host (Cloudflare) handles the HTTPS requests themselves.</p></div></details>
+    </div>
+  </Section>
+</Layout>
+
+<style is:global>
+  /* hero */
+  .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line);
+    background: radial-gradient(60rem 28rem at 85% -10%, var(--glow), transparent 70%), radial-gradient(40rem 24rem at -10% 20%, var(--glow2), transparent 70%), var(--bg); }
+  .hero::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(70% 60% at 70% 30%, #000, transparent); mask-image: radial-gradient(70% 60% at 70% 30%, #000, transparent); }
+  .hero .wrap { position: relative; }
+  .hero-grid { display: grid; gap: 2.5rem; padding: 2.5rem 0 4rem; align-items: center; }
+  @media (min-width: 62rem) { .hero-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); padding: 4rem 0 5.5rem; gap: 3.5rem; } }
+  @media (max-width: 40rem) { .hero-grid { padding-bottom: 3rem; } }
+  .pill { display: inline-flex; align-items: center; gap: .5rem; padding: .25rem .75rem; border: 1px solid var(--line); border-radius: 999px; background: var(--card); font-size: .82rem; color: var(--mut); }
+  .pill i { width: .5rem; height: .5rem; border-radius: 50%; background: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+  h1 { font-size: clamp(2.25rem, 6vw, 3.6rem); margin: 1.1rem 0 1rem; font-weight: 800; letter-spacing: -.03em; }
+  h1 em { font-style: normal; color: var(--acc); }
+  .lead { font-size: 1.15rem; color: var(--mut); max-width: 34rem; }
+  .cta { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1.75rem 0 2rem; }
+  .stats { display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem; margin: 0; padding: 0; list-style: none; }
+  .stats b { display: block; font-size: 1.7rem; line-height: 1.1; letter-spacing: -.02em; }
+  .stats span { font-size: .85rem; color: var(--mut); }
+
+  /* why, systems, featured */
+  .why { grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); }
+  .card h3 { font-size: 1.05rem; margin: .9rem 0 .4rem; letter-spacing: -.01em; }
+  .card p { color: var(--mut); font-size: .95rem; }
+  .strip { list-style: none; margin: 0; padding: 0; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); }
+  .strip h3 { margin-top: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .6rem; }
+  .strip h3 a { color: var(--fg); text-decoration: none; }
+  .strip h3 a:hover { color: var(--acc); text-decoration: underline; }
+  .strip .ver { font: .8rem var(--mono); color: var(--mut); }
+  .more { margin-top: 1.5rem; }
+  .os { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
+  .os h3 { margin: 0 0 .1rem; font-size: 1rem; }
+  .os ul { margin: .6rem 0 0; padding-left: 1.1rem; color: var(--mut); font-size: .93rem; }
+
+  /* install steps */
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2rem; counter-reset: s; }
+  .steps > li { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); counter-increment: s; }
+  @media (min-width: 62rem) { .steps > li { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 2.5rem; align-items: start; } }
+  .steps h3 { font-size: 1.2rem; display: flex; gap: .8rem; align-items: center; }
+  .steps h3::before { content: counter(s); flex: none; width: 2rem; height: 2rem; border-radius: 50%; background: var(--acc); color: var(--acc-fg); display: grid; place-items: center; font-size: .95rem; }
+  .steps p { margin-top: .6rem; color: var(--mut); }
+  .steps dl { margin: .8rem 0 0; font-size: .9rem; color: var(--mut); }
+  .steps dt { display: inline; font-family: var(--mono); color: var(--fg); font-size: .85rem; }
+  .steps dd { display: inline; margin: 0; }
+  .steps dd::after { content: ""; display: block; margin-bottom: .35rem; }
+
+  /* trust */
+  .two { display: grid; gap: 2rem; }
+  @media (min-width: 62rem) { .two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3rem; align-items: start; } }
+  .flow { list-style: none; margin: 0; padding: 0; display: grid; gap: .75rem; }
+  .flow li { display: grid; grid-template-columns: 2.4rem 1fr; gap: .9rem; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: .9rem 1rem; }
+  .flow b { display: block; }
+  .flow span { color: var(--mut); font-size: .92rem; }
+  .flow .n { width: 2.4rem; height: 2.4rem; border-radius: 50%; background: var(--acc-soft); color: var(--acc); display: grid; place-items: center; font-weight: 700; }
+  .gap { margin-top: .6rem; margin-bottom: 1rem; }
+  .fp-row { display: flex; gap: .6rem; align-items: flex-start; margin: 0 0 1rem; }
+  .fp { flex: 1; min-width: 0; margin: 0; font-family: var(--mono); font-size: 1.02rem; letter-spacing: .02em; word-spacing: .35em; padding: 1rem 1.1rem; background: var(--card);
+    border: 1px solid var(--line); border-left: 4px solid var(--acc); border-radius: 10px; overflow-wrap: anywhere; }
+  .fp-row .copy { margin-top: .9rem; }
+  .links { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; list-style: none; margin: 1.25rem 0 0; padding: 0; }
+
+  /* faq */
+  .faq { display: grid; gap: .75rem; max-width: 50rem; }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 0 1.2rem; }
+  details[open] { border-color: var(--acc); }
+  summary { cursor: pointer; font-weight: 600; padding: 1rem 0; list-style: none; display: flex; justify-content: space-between; gap: 1rem; border-radius: 8px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--acc); font-size: 1.3rem; line-height: 1; }
+  details[open] summary::after { content: "\2212"; }
+  details > div { padding: 0 0 1.1rem; color: var(--mut); }
+  details > div > * + * { margin-top: .8rem; }
+</style>

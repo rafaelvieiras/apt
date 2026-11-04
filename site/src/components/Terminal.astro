@@ -1,0 +1,31 @@
+---
+import CopyButton from "./CopyButton.astro";
+
+interface Props {
+  title: string;
+  code: string;
+  label: string;
+}
+const { title, code, label } = Astro.props;
+const lines = code.split("\n");
+---
+<figure class="term">
+  <figcaption>
+    <i></i><i></i><i></i>
+    <span class="title">{title}</span>
+    <CopyButton text={code} label={label} />
+  </figcaption>
+  <pre tabindex="0"><code>{lines.map((line) => (line.startsWith("#") ? <span class="c">{line}{"\n"}</span> : <>{line}{"\n"}</>))}</code></pre>
+</figure>
+
+<style>
+  .term { margin: 0; border: 1px solid var(--term-line); border-radius: 12px; background: var(--term); color: var(--term-fg);
+    overflow: hidden; box-shadow: var(--shadow); min-width: 0; text-align: left; }
+  figcaption { display: flex; align-items: center; gap: .4rem; padding: .45rem .6rem .45rem .8rem; border-bottom: 1px solid var(--term-line);
+    font-size: .78rem; color: var(--term-mut); }
+  i { width: .65rem; height: .65rem; border-radius: 50%; background: #2c3e43; flex: none; }
+  .title { margin-left: .4rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  pre { margin: 0; padding: 1rem 1.1rem; overflow-x: auto; font-size: .82rem; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; color: inherit; }
+  .c { color: var(--term-mut); }
+</style>

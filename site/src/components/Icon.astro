@@ -1,0 +1,20 @@
+---
+interface Props {
+  name: "clock" | "layers" | "shield" | "nobody" | "code";
+}
+const { name } = Astro.props;
+---
+<span class="ico">
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    {name === "clock" && (<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>)}
+    {name === "layers" && <path d="M12 3 3 8l9 5 9-5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5" />}
+    {name === "shield" && (<><path d="M12 21s8-3.5 8-10V5.5L12 3 4 5.5V11c0 6.5 8 10 8 10z" /><path d="m9 12 2.2 2.2L15.5 10" /></>)}
+    {name === "nobody" && (<><circle cx="12" cy="12" r="9" /><path d="m5.7 5.7 12.6 12.6" /></>)}
+    {name === "code" && <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />}
+  </svg>
+</span>
+
+<style>
+  .ico { width: 2.6rem; height: 2.6rem; border-radius: 11px; background: var(--acc-soft); color: var(--acc); display: grid; place-items: center; }
+  svg { width: 1.4rem; height: 1.4rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+</style>

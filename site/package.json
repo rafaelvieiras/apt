@@ -1,0 +1,18 @@
+{
+  "name": "rafaelvieiras-apt-site",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Static landing site for the rafaelvieiras apt repository",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "devDependencies": {
+    "astro": "7.4.5"
+  }
+}
