@@ -1,0 +1,18 @@
+name = "yazi"
+license = "MIT"
+homepage = "https://yazi-rs.github.io"
+
+[source]
+type = "github-release"
+repo = "sxyazi/yazi"
+
+# Upstream already ships proper .deb files, so we republish them untouched.
+# The musl build is statically linked, so it runs on every Debian/Ubuntu release.
+# The glibc build needs libc6 >= 2.39 and would break Debian 12 and Ubuntu 22.04.
+[build]
+kind = "deb"
+revision = 1
+
+[assets]
+amd64 = "yazi-x86_64-unknown-linux-musl.deb"
+arm64 = "yazi-aarch64-unknown-linux-musl.deb"

@@ -1,0 +1,295 @@
+"""Offline tests. Upstream is faked, GnuPG and dpkg-deb are real."""
+
+from __future__ import annotations
+
+import io
+import json
+import subprocess
+import tarfile
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from aptrepo import debbuild, debversion, licenses, publish, recipe, repo, sign, storage, upstream
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def make_key(home: Path) -> tuple[str, bytes]:
+    home.mkdir(parents=True, exist_ok=True)
+    home.chmod(0o700)
+    base = ["gpg", "--homedir", str(home), "--batch", "--pinentry-mode", "loopback", "--passphrase", ""]
+    subprocess.run(base + ["--quick-generate-key", "t <t@example.invalid>", "ed25519", "sign", "never"],
+                   check=True, capture_output=True)
+    sec = subprocess.run(base + ["--armor", "--export-secret-keys"], check=True, capture_output=True).stdout
+    pub = subprocess.run(base + ["--armor", "--export"], check=True, capture_output=True).stdout
+    return sec.decode(), pub
+
+
+def make_tarball(path: Path, top: str = "tool-linux-x86_64") -> None:
+    with tarfile.open(path, "w:gz") as tar:
+        for name, data, mode in [
+            (f"{top}/bin/tool", b"#!/bin/sh\necho tool\n", 0o755),
+            (f"{top}/share/tool/runtime.txt", b"runtime\n", 0o644),
+        ]:
+            info = tarfile.TarInfo(name)
+            info.size, info.mode = len(data), mode
+            tar.addfile(info, io.BytesIO(data))
+
+
+CFG = repo.RepoConfig(
+    origin="Test", label="Test", suite="stable", component="main", architectures=["amd64", "arm64"],
+    base_url="https://apt.example.test", description="d", key_file="unused", key_name="k",
+)
+
+
+class DebVersion(unittest.TestCase):
+    def test_matches_dpkg(self):
+        values = ["1.0", "1.0-1", "1.0~rc1", "1:0.5", "0.12.6-1", "0.12.5-1~noble", "26.9.1-1",
+                  "1.0+b1", "1.0a", "1.00", "10.0", "9.9", "1.0-1ubuntu1"]
+        for a in values:
+            for b in values:
+                lt = subprocess.run(["dpkg", "--compare-versions", a, "lt", b]).returncode == 0
+                eq = subprocess.run(["dpkg", "--compare-versions", a, "eq", b]).returncode == 0
+                self.assertEqual(debversion.compare(a, b), -1 if lt else (0 if eq else 1), (a, b))
+
+
+class Licenses(unittest.TestCase):
+    def test_allows_spdx_expression(self):
+        licenses.check("Apache-2.0 AND Vim")
+        licenses.check("MIT")
+
+    def test_fails_closed(self):
+        for bad in ("Proprietary", "MIT AND SSPL-1.0", "", "BUSL-1.1"):
+            with self.assertRaises(licenses.LicenseError, msg=bad):
+                licenses.check(bad)
+
+
+class Recipes(unittest.TestCase):
+    def test_shipped_recipes_are_valid(self):
+        recipes = recipe.load_recipes(ROOT / "packages")
+        self.assertTrue(recipes)
+        for r in recipes:
+            licenses.check(r.license)
+
+    def test_rejects_bad_input(self):
+        base = {"name": "x", "license": "MIT", "source": {"repo": "a/b"}, "build": {"kind": "deb"},
+                "assets": {"amd64": "x.deb"}}
+        recipe.parse_recipe(base)
+        for patch in ({"assets": {"riscv": "x"}}, {"build": {"kind": "magic"}}, {"source": {}}):
+            with self.assertRaises(recipe.RecipeError):
+                recipe.parse_recipe({**base, **patch})
+        with self.assertRaises(recipe.RecipeError):  # tarball needs a description
+            recipe.parse_recipe({**base, "build": {"kind": "tarball"}})
+
+
+class Index(unittest.TestCase):
+    def state(self):
+        s = repo.empty_state()
+        for ver, up in (("1.0-1", "1.0"), ("1.1-1", "1.1")):
+            repo.add_version(
+                s, name="tool", homepage="https://x", license="MIT", version=ver, upstream_version=up,
+                source="https://x/r", released="2026-01-01T00:00:00Z",
+                arches={a: {"filename": f"pool/main/t/tool/tool_{ver}_{a}.deb", "size": 3, "md5": "m",
+                            "sha1": "s", "sha256": "h",
+                            "control": f"Package: tool\nVersion: {ver}\nArchitecture: {a}\nDescription: A tool"}
+                        for a in ("amd64", "arm64")},
+            )
+        return s
+
+    def test_packages_lists_newest_first_per_arch(self):
+        text = repo.render_packages(self.state(), "amd64").decode()
+        self.assertLess(text.index("Version: 1.1-1"), text.index("Version: 1.0-1"))
+        self.assertIn("Filename: pool/main/t/tool/tool_1.1-1_amd64.deb", text)
+        self.assertNotIn("arm64.deb", text)
+
+    def test_release_hashes_match_files_and_by_hash(self):
+        out = repo.render_dists(self.state(), CFG, now=0)
+        release = out.release.decode()
+        self.assertIn("Acquire-By-Hash: yes", release)
+        self.assertIn("Suite: stable", release)
+        for key, data in out.files.items():
+            rel = key.removeprefix("dists/stable/")
+            if rel in ("Release",):
+                continue
+            import hashlib
+            self.assertIn(f" {hashlib.sha256(data).hexdigest()} ", release, rel)
+        for key, data in out.byhash.items():
+            import hashlib
+            self.assertTrue(key.endswith(hashlib.sha256(data).hexdigest()))
+
+    def test_prune_keeps_newest(self):
+        s = self.state()
+        doomed = repo.prune(s, 1)
+        self.assertEqual(list(s["packages"]["tool"]["versions"]), ["1.1-1"])
+        self.assertEqual(len(doomed), 2)
+
+    def test_render_is_deterministic(self):
+        a = repo.render_dists(self.state(), CFG, now=0)
+        b = repo.render_dists(self.state(), CFG, now=0)
+        self.assertEqual(a.files, b.files)
+
+
+class CachePolicy(unittest.TestCase):
+    def test_immutable_vs_short(self):
+        for key in ("pool/main/t/tool/tool_1_amd64.deb",
+                    "dists/stable/main/binary-amd64/by-hash/SHA256/abc"):
+            self.assertEqual(storage.cache_control(key), storage.IMMUTABLE, key)
+        for key in ("index.json", "dists/stable/InRelease", "dists/stable/Release",
+                    "dists/stable/main/binary-amd64/Packages.xz", "key.gpg", "index.html"):
+            self.assertEqual(storage.cache_control(key), storage.SHORT, key)
+
+    def test_dir_storage_blocks_escape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                storage.DirStorage(Path(tmp)).put("../evil", b"x")
+
+
+class Signing(unittest.TestCase):
+    def test_clearsign_roundtrip_and_tamper(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sec, pub = make_key(Path(tmp))
+            with sign.Signer(sec) as signer:
+                signed = signer.clearsign(b"Suite: stable\n")
+            sign.verify_clearsigned(pub, signed)
+            with self.assertRaises(sign.SignError):
+                sign.verify_clearsigned(pub, signed.replace(b"stable", b"evil"))
+
+
+class Build(unittest.TestCase):
+    def test_tarball_deb_is_valid_and_reproducible(self):
+        r = recipe.parse_recipe({
+            "name": "tool", "license": "MIT", "source": {"repo": "a/b"},
+            "build": {"kind": "tarball", "revision": 2, "license_path": "L"},
+            "assets": {"amd64": "t.tgz"},
+            "package": {"section": "utils", "description": "Short\nLong line one\n.\nLong line two",
+                        "depends": "libc6", "replaces": "tool-runtime (<< {deb_version})"},
+        })
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            tgz = tmp / "t.tgz"
+            make_tarball(tgz)
+            debs = [debbuild.build_from_tarball(r, "amd64", "1.2.3", tgz, "MIT text", tmp / f"o{i}", 1_700_000_000)
+                    for i in range(2)]
+            self.assertEqual(debs[0].name, "tool_1.2.3-2_amd64.deb")
+            self.assertEqual(debs[0].read_bytes(), debs[1].read_bytes(), "build must be reproducible")
+            self.assertEqual(debbuild.control_field(debs[0], "Version"), "1.2.3-2")
+            self.assertEqual(debbuild.control_field(debs[0], "Replaces"), "tool-runtime (<< 1.2.3-2)")
+            listing = subprocess.run(["dpkg-deb", "-c", str(debs[0])], capture_output=True, text=True).stdout
+            self.assertIn("./usr/bin/tool", listing)
+            self.assertIn("./usr/share/doc/tool/copyright", listing)
+            self.assertNotIn("tool-linux-x86_64", listing, "top-level dir must be stripped")
+            self.assertTrue(all("root/root" in line for line in listing.splitlines()))
+
+    def test_rejects_path_traversal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            tgz = tmp / "evil.tgz"
+            with tarfile.open(tgz, "w:gz") as tar:
+                info = tarfile.TarInfo("top/../../escape")
+                info.size = 1
+                tar.addfile(info, io.BytesIO(b"x"))
+            with self.assertRaises(Exception):
+                debbuild._extract(tgz, tmp / "dest")
+
+
+class PublishFlow(unittest.TestCase):
+    """Full publish against a fake upstream and a directory bucket."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        self.sec, self.pub = make_key(self.dir / "gnupg")
+        self.key_path = self.dir / "pub.asc"
+        self.key_path.write_bytes(self.pub)
+        (self.dir / "packages").mkdir()
+        (self.dir / "packages" / "tool.toml").write_text(
+            'name="tool"\nlicense="MIT"\n[source]\nrepo="a/b"\n[build]\nkind="tarball"\nlicense_path="L"\n'
+            '[assets]\namd64="t.tgz"\n[package]\nsection="utils"\ndescription="Short\\nLong"\n'
+            '[[companion]]\nname="tool-runtime"\ndescription="Transitional\\nEmpty"\n'
+        )
+        self.tgz = self.dir / "t.tgz"
+        make_tarball(self.tgz)
+        self.tag = "v1.0.0"
+        self.store = storage.DirStorage(self.dir / "bucket")
+
+    def _copy_tgz(self, asset, dest):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(self.tgz.read_bytes())
+        return "x"
+
+    def run_publish(self, **kw):
+        def fake_latest(_repo):
+            asset = upstream.Asset("t.tgz", "https://example.invalid/t.tgz", 1, None)
+            return upstream.Release(self.tag, "2026-01-01T00:00:00Z", {"t.tgz": asset})
+
+        def fake_download(asset, dest):
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(self.tgz.read_bytes())
+            return "x"
+
+        with mock.patch.object(upstream, "latest_release", fake_latest), \
+             mock.patch.object(upstream, "download", fake_download), \
+             mock.patch.object(upstream, "fetch_text", lambda url: "MIT text"):
+            return publish.publish(CFG, self.dir / "packages", self.store, private_key=self.sec,
+                                   passphrase=None, log=lambda *_: None, key_path=self.key_path, **kw)
+
+    def test_publish_signs_uploads_and_is_idempotent(self):
+        first = self.run_publish()
+        self.assertEqual((first.published, first.errors), (["tool"], []))
+        sign.verify_clearsigned(self.pub, self.store.get("dists/stable/InRelease"))
+        state = json.loads(self.store.get("index.json"))
+        self.assertEqual(set(state["packages"]), {"tool", "tool-runtime"})
+        self.assertTrue(self.store.exists("pool/main/t/tool/tool_1.0.0-1_amd64.deb"))
+        self.assertTrue(self.store.exists("pool/main/t/tool-runtime/tool-runtime_1.0.0-1_amd64.deb"))
+        self.assertEqual(self.store.headers["pool/main/t/tool/tool_1.0.0-1_amd64.deb"], storage.IMMUTABLE)
+        self.assertEqual(self.store.headers["dists/stable/InRelease"], storage.SHORT)
+        before = self.store.get("dists/stable/InRelease")
+        second = self.run_publish()
+        self.assertEqual((second.published, second.skipped), ([], ["tool"]))
+        self.assertEqual(self.store.get("dists/stable/InRelease"), before, "no-op must not re-sign")
+
+    def test_never_goes_backwards(self):
+        self.run_publish()
+        self.tag = "v0.9.0"
+        again = self.run_publish()
+        self.assertEqual(again.published, [])
+
+    def test_new_release_prunes_and_cleans_pool(self):
+        for tag in ("v1.0.0", "v1.1.0", "v1.2.0", "v1.3.0"):
+            self.tag = tag
+            self.run_publish()
+        state = json.loads(self.store.get("index.json"))
+        self.assertEqual(len(state["packages"]["tool"]["versions"]), CFG.retain)
+        self.assertFalse(self.store.exists("pool/main/t/tool/tool_1.0.0-1_amd64.deb"))
+        self.assertTrue(self.store.exists("pool/main/t/tool/tool_1.3.0-1_amd64.deb"))
+
+    def test_refuses_unsigned_and_mismatched_key(self):
+        with self.assertRaises(sign.SignError):
+            with mock.patch.object(upstream, "latest_release", return_value=upstream.Release(
+                    "v1.0.0", "", {"t.tgz": upstream.Asset("t.tgz", "u", 1, None)})), \
+                 mock.patch.object(upstream, "download", self._copy_tgz), \
+                 mock.patch.object(upstream, "fetch_text", lambda u: "L"):
+                publish.publish(CFG, self.dir / "packages", self.store, private_key=None, passphrase=None,
+                                log=lambda *_: None, key_path=self.key_path)
+        other_home = self.dir / "other"
+        other_home.mkdir()
+        other_sec, _ = make_key(other_home)
+        self.sec = other_sec
+        with self.assertRaises(sign.SignError):
+            self.run_publish()
+        self.assertIsNone(self.store.get("dists/stable/InRelease"))
+
+    def test_one_failing_package_does_not_block_others(self):
+        (self.dir / "packages" / "bad.toml").write_text(
+            'name="bad"\nlicense="Proprietary"\n[source]\nrepo="a/c"\n[build]\nkind="deb"\n[assets]\namd64="b.deb"\n')
+        result = self.run_publish()
+        self.assertEqual(result.published, ["tool"])
+        self.assertEqual(len(result.errors), 1)
+        self.assertIn("allowlist", result.errors[0])
+
+
+if __name__ == "__main__":
+    unittest.main()

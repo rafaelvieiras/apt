@@ -1,0 +1,13 @@
+# Repository identity. Served from a Cloudflare R2 bucket behind apt.rafaelvieiras.com.
+[repository]
+origin = "rafaelvieiras apt"
+label = "rafaelvieiras apt"
+description = "Current builds of developer tools that Debian and Ubuntu package late or not at all."
+suite = "stable"
+component = "main"
+architectures = ["amd64", "arm64"]
+base_url = "https://apt.rafaelvieiras.com"
+# Public half of the signing key. Commit it; the private half lives in Bitwarden.
+key_file = "keys/rafaelvieiras-apt.asc"
+# Versions kept per package. Older ones are deleted from the bucket.
+retain = 3

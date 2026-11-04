@@ -1,0 +1,40 @@
+name = "neovim"
+license = "Apache-2.0 AND Vim"
+homepage = "https://neovim.io"
+
+[source]
+type = "github-release"
+repo = "neovim/neovim"
+
+# Upstream only ships tarballs. We wrap them into a .deb installed under /usr.
+[build]
+kind = "tarball"
+revision = 1
+license_path = "LICENSE.txt"
+
+[assets]
+amd64 = "nvim-linux-x86_64.tar.gz"
+arm64 = "nvim-linux-arm64.tar.gz"
+
+[package]
+section = "editors"
+depends = "libc6 (>= 2.34), libgcc-s1 (>= 3.4)"
+recommends = "python3-pynvim, xxd, xclip | xsel | wl-clipboard"
+provides = "editor"
+# Debian and Ubuntu split the files into neovim-runtime; ours ships them in one package.
+replaces = "neovim-runtime (<< {deb_version})"
+description = """\
+Vim-fork focused on extensibility and usability
+Neovim is a refactor of Vim that aims to be extensible and maintainable.
+It ships with msgpack RPC, an embedded Lua runtime and a built-in terminal.
+.
+This package is the official upstream release, repackaged without changes."""
+
+# Debian/Ubuntu neovim depends on neovim-runtime. Publishing an empty one at our version
+# lets a plain `apt upgrade` move both together instead of holding neovim back.
+[[companion]]
+name = "neovim-runtime"
+description = """\
+Transitional package for neovim
+This empty package keeps upgrades from the distribution packages working.
+It can be removed once neovim is installed."""

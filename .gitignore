@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+# Never commit private keys, credentials or local test buckets.
+*.sec
+*.key
+*.secret.asc
+.env
+/bucket/
+/dist/

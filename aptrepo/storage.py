@@ -1,0 +1,155 @@
+"""Object storage backends: a local directory (tests, dry runs) and Cloudflare R2.
+
+R2 is reached through its S3 API with the ``aws`` CLI. Credentials come from the
+environment (``AWS_ACCESS_KEY_ID`` / ``AWS_SECRET_ACCESS_KEY``) and are never put
+on a command line.
+"""
+
+from __future__ import annotations
+
+import mimetypes
+import os
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Protocol
+
+IMMUTABLE = "public, max-age=31536000, immutable"
+SHORT = "public, max-age=300"
+
+
+def cache_control(key: str) -> str:
+    """Cache policy by key.
+
+    Content-addressed or versioned files never change, so they cache for a year.
+    The few mutable entry points (Release, InRelease, index.json, ...) cache for
+    five minutes, which is enough to absorb traffic and still lets updates land.
+    """
+    if key.startswith("pool/") or "/by-hash/" in key:
+        return IMMUTABLE
+    return SHORT
+
+
+def content_type(key: str) -> str:
+    name = key.rsplit("/", 1)[-1]
+    if name in ("Release", "InRelease", "Packages", "Release.gpg") or key.endswith(".asc"):
+        return "text/plain; charset=utf-8"
+    if key.endswith(".deb"):
+        return "application/vnd.debian.binary-package"
+    if key.endswith((".gz", ".xz")):
+        return "application/octet-stream"
+    if key.endswith(".json"):
+        return "application/json"
+    if key.endswith(".html"):
+        return "text/html; charset=utf-8"
+    return mimetypes.guess_type(name)[0] or "application/octet-stream"
+
+
+class Storage(Protocol):
+    def get(self, key: str) -> bytes | None: ...
+    def put(self, key: str, data: bytes) -> None: ...
+    def put_file(self, key: str, path: Path) -> None: ...
+    def delete(self, key: str) -> None: ...
+    def exists(self, key: str) -> bool: ...
+
+
+class DirStorage:
+    """Plain directory. ``headers`` records the cache policy so tests can assert it."""
+
+    def __init__(self, root: Path):
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.headers: dict[str, str] = {}
+
+    def _path(self, key: str) -> Path:
+        path = (self.root / key).resolve()
+        if self.root.resolve() not in path.parents:
+            raise ValueError(f"key escapes storage root: {key}")
+        return path
+
+    def get(self, key: str) -> bytes | None:
+        path = self._path(key)
+        return path.read_bytes() if path.is_file() else None
+
+    def put(self, key: str, data: bytes) -> None:
+        path = self._path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + ".part")
+        tmp.write_bytes(data)
+        tmp.replace(path)
+        self.headers[key] = cache_control(key)
+
+    def put_file(self, key: str, path: Path) -> None:
+        dest = self._path(key)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, dest)
+        self.headers[key] = cache_control(key)
+
+    def delete(self, key: str) -> None:
+        self._path(key).unlink(missing_ok=True)
+
+    def exists(self, key: str) -> bool:
+        return self._path(key).is_file()
+
+
+class R2Storage:
+    def __init__(self, bucket: str, endpoint: str):
+        self.bucket = bucket
+        self.endpoint = endpoint
+        if shutil.which("aws") is None:
+            raise RuntimeError("the 'aws' CLI is required for R2 storage")
+        for var in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"):
+            if not os.environ.get(var):
+                raise RuntimeError(f"{var} is not set")
+
+    def _aws(self, args: list[str], check: bool = True) -> subprocess.CompletedProcess:
+        env = dict(os.environ, AWS_DEFAULT_REGION="auto", AWS_EC2_METADATA_DISABLED="true")
+        cmd = ["aws", "--endpoint-url", self.endpoint, *args]
+        proc = subprocess.run(cmd, capture_output=True, env=env)
+        if check and proc.returncode != 0:
+            raise RuntimeError(f"aws {args[0]} {args[1]} failed: {proc.stderr.decode(errors='replace').strip()}")
+        return proc
+
+    def get(self, key: str) -> bytes | None:
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "obj"
+            proc = self._aws(["s3api", "get-object", "--bucket", self.bucket, "--key", key, str(dest)], check=False)
+            if proc.returncode != 0:
+                if b"NoSuchKey" in proc.stderr or b"Not Found" in proc.stderr:
+                    return None
+                raise RuntimeError(f"get {key}: {proc.stderr.decode(errors='replace').strip()}")
+            return dest.read_bytes()
+
+    def put_file(self, key: str, path: Path) -> None:
+        self._aws(
+            [
+                "s3api", "put-object", "--bucket", self.bucket, "--key", key, "--body", str(path),
+                "--cache-control", cache_control(key), "--content-type", content_type(key),
+            ]
+        )
+
+    def put(self, key: str, data: bytes) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "obj"
+            path.write_bytes(data)
+            self.put_file(key, path)
+
+    def delete(self, key: str) -> None:
+        self._aws(["s3api", "delete-object", "--bucket", self.bucket, "--key", key])
+
+    def exists(self, key: str) -> bool:
+        proc = self._aws(["s3api", "head-object", "--bucket", self.bucket, "--key", key], check=False)
+        return proc.returncode == 0
+
+
+def open_storage(spec: str) -> Storage:
+    """``dir:PATH`` or ``r2`` (reads R2_BUCKET and R2_ENDPOINT from the environment)."""
+    if spec.startswith("dir:"):
+        return DirStorage(Path(spec[4:]))
+    if spec == "r2":
+        bucket, endpoint = os.environ.get("R2_BUCKET"), os.environ.get("R2_ENDPOINT")
+        if not bucket or not endpoint:
+            raise RuntimeError("R2_BUCKET and R2_ENDPOINT must be set for --storage r2")
+        return R2Storage(bucket, endpoint)
+    raise ValueError(f"unknown storage {spec!r}; use 'dir:PATH' or 'r2'")
