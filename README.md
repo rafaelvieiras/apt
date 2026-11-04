@@ -20,7 +20,7 @@ Suites: stable
 Components: main
 Signed-By: /etc/apt/keyrings/rafaelvieiras-apt.gpg
 EOF
-sudo apt update && sudo apt install neovim yazi
+sudo apt update && sudo apt install neovim yazi   # or any package from the table below
 ```
 
 One suite (`stable`) serves every Debian and Ubuntu release, because the packages
@@ -31,6 +31,14 @@ The catalogue is also published as [`index.json`](https://apt.rafaelvieiras.com/
 |---|---|---|
 | `neovim` | [neovim/neovim](https://github.com/neovim/neovim) | upstream tarball wrapped into a `.deb` |
 | `yazi` | [sxyazi/yazi](https://github.com/sxyazi/yazi) | upstream static (musl) `.deb`, republished untouched |
+| `fzf` | [junegunn/fzf](https://github.com/junegunn/fzf) | upstream binary wrapped into a `.deb` |
+| `ripgrep` | [BurntSushi/ripgrep](https://github.com/BurntSushi/ripgrep) | upstream static (musl) build, man page and completions |
+| `zoxide` | [ajeetdsouza/zoxide](https://github.com/ajeetdsouza/zoxide) | upstream static (musl) build, man pages and completions |
+| `yt-dlp` | [yt-dlp/yt-dlp](https://github.com/yt-dlp/yt-dlp) | upstream zipapp, runs on the system `python3` (>= 3.11); architecture `all` |
+| `ghostty` | [ghostty-org/ghostty](https://ghostty.org) | community `.deb` from [mkasberg/ghostty-ubuntu](https://github.com/mkasberg/ghostty-ubuntu) (Ghostty ships no Linux binaries); needs glibc >= 2.38: Ubuntu 24.04+, Debian 13+ |
+
+Some packages need a newer system than others. `apt` refuses to install a package it cannot satisfy
+(`yt-dlp` on Ubuntu 22.04, `ghostty` on Debian 12 and Ubuntu 22.04) and leaves the rest alone.
 
 ## How it works
 

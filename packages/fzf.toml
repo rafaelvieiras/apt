@@ -1,0 +1,29 @@
+name = "fzf"
+license = "MIT"
+homepage = "https://github.com/junegunn/fzf"
+
+[source]
+type = "github-release"
+repo = "junegunn/fzf"
+
+[build]
+kind = "files"
+revision = 1
+license_path = "LICENSE"
+
+[assets]
+amd64 = "fzf-*-linux_amd64.tar.gz"
+arm64 = "fzf-*-linux_arm64.tar.gz"
+
+[[file]]
+src = "fzf"
+dest = "/usr/bin/fzf"
+
+[package]
+section = "utils"
+description = """\
+General-purpose command-line fuzzy finder
+fzf is an interactive filter for lists of any kind: files, command history,
+processes, git commits. It is a single static binary.
+.
+This package is the official upstream release, repackaged without changes."""

@@ -13,4 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `by-hash`, GnuPG signing, directory and Cloudflare R2 storage, static landing page.
 - Recipes for `neovim` (wrapped upstream tarball) and `yazi` (upstream musl `.deb`).
 - Transitional `neovim-runtime` so `apt upgrade` moves Debian/Ubuntu installs over cleanly.
+- New recipe kind `files`: pick files out of an upstream archive by glob and install them at fixed
+  paths (gzipped man pages, shell completions), with an optional second asset via `from`.
+- Architecture-independent packages (`assets.all`), listed in every `binary-<arch>` index.
+- `[package]` overrides on `kind = "deb"` recipes, to fix dependencies of republished `.deb` files.
+- Asset names in recipes can be globs.
+- Recipes for `fzf`, `ripgrep`, `zoxide`, `yt-dlp` (zipapp) and `ghostty`.
 - GitHub Actions: CI and a scheduled publish workflow.

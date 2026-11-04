@@ -194,6 +194,143 @@ class Build(unittest.TestCase):
                 debbuild._extract(tgz, tmp / "dest")
 
 
+def files_recipe(**over):
+    data = {
+        "name": "tool", "license": "MIT", "source": {"repo": "a/b"},
+        "build": {"kind": "files", "license_path": "L", "revision": 2},
+        "assets": {"amd64": "tool-*-amd64.tar.gz"},
+        "file": [
+            {"src": "*/bin/tool", "dest": "/usr/bin/tool"},
+            {"src": "*/man/*.1", "dest": "/usr/share/man/man1/", "gzip": True},
+            {"src": "*/comp/tool.bash", "dest": "/usr/share/bash-completion/completions/tool"},
+        ],
+        "package": {"section": "utils", "description": "Short\nLong", "depends": "python3 (>= 3.11)"},
+    }
+    data.update(over)
+    return recipe.parse_recipe(data)
+
+
+def make_files_tarball(path: Path) -> None:
+    with tarfile.open(path, "w:gz") as tar:
+        for name, data in [("tool-1/bin/tool", b"#!/bin/sh\n"), ("tool-1/man/tool.1", b".TH TOOL\n"),
+                           ("tool-1/man/tool-add.1", b".TH ADD\n"), ("tool-1/comp/tool.bash", b"# c\n"),
+                           ("tool-1/README", b"readme\n")]:
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+
+
+class FilesKind(unittest.TestCase):
+    def build(self, rec, tmp, assets=None, epoch=1_700_000_000):
+        tgz = tmp / "tool-1-amd64.tar.gz"
+        make_files_tarball(tgz)
+        return debbuild.build_from_files(rec, "amd64", "1.0", assets or {"tool-*-amd64.tar.gz": (tgz.name, tgz)},
+                                         "MIT text", tmp / "out", epoch)
+
+    def test_places_files_and_is_reproducible(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            a = self.build(files_recipe(), tmp)
+            data = a.read_bytes()
+            b = self.build(files_recipe(), tmp)
+            self.assertEqual(data, b.read_bytes(), "must be reproducible")
+            self.assertEqual(a.name, "tool_1.0-2_amd64.deb")
+            listing = subprocess.run(["dpkg-deb", "-c", str(a)], capture_output=True, text=True).stdout
+            for want in ("./usr/bin/tool", "./usr/share/man/man1/tool.1.gz", "./usr/share/man/man1/tool-add.1.gz",
+                         "./usr/share/bash-completion/completions/tool", "./usr/share/doc/tool/copyright"):
+                self.assertIn(want, listing)
+            self.assertNotIn("README", listing, "only listed files may be shipped")
+            bin_line = next(l for l in listing.splitlines() if l.endswith("usr/bin/tool"))
+            self.assertTrue(bin_line.startswith("-rwxr-xr-x"), bin_line)
+            self.assertEqual(debbuild.control_field(a, "Depends"), "python3 (>= 3.11)")
+
+    def test_glob_must_match_exactly_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rec = files_recipe(file=[{"src": "*/man/*.1", "dest": "/usr/share/man/man1/tool.1"}])
+            with self.assertRaises(debbuild.BuildError):
+                self.build(rec, Path(tmp))
+            rec = files_recipe(file=[{"src": "*/nothing", "dest": "/usr/bin/tool"}])
+            with self.assertRaises(debbuild.BuildError):
+                self.build(rec, Path(tmp))
+
+    def test_second_asset_via_from(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            tgz = tmp / "x.tar.gz"
+            make_files_tarball(tgz)
+            script = tmp / "tool"
+            script.write_text("#!/usr/bin/env python3\n")
+            rec = files_recipe(
+                assets={"all": "tool"},
+                file=[{"src": "tool", "dest": "/usr/bin/tool"},
+                      {"from": "x.tar.gz", "src": "tool-1/man/tool.1", "dest": "/usr/share/man/man1/tool.1"}],
+            )
+            deb = debbuild.build_from_files(rec, "all", "1.0", {"tool": ("tool", script), "x.tar.gz": ("x.tar.gz", tgz)},
+                                            "L", tmp / "out", 0)
+            self.assertEqual(deb.name, "tool_1.0-2_all.deb")
+            self.assertEqual(debbuild.control_field(deb, "Architecture"), "all")
+
+    def test_recipe_validation(self):
+        with self.assertRaises(recipe.RecipeError):
+            files_recipe(file=[])
+        with self.assertRaises(recipe.RecipeError):
+            files_recipe(file=[{"src": "x", "dest": "/etc/passwd"}])  # outside /usr
+        with self.assertRaises(recipe.RecipeError):
+            files_recipe(file=[{"src": "x", "dest": "/usr/../etc/x"}])
+        with self.assertRaises(recipe.RecipeError):
+            files_recipe(assets={"all": "a", "amd64": "b"})
+
+    def test_find_asset_glob(self):
+        mk = lambda n: upstream.Asset(n, "u", 1, None)
+        rel = upstream.Release("v1", "", {n: mk(n) for n in ("a_24.04.deb", "a_26.04.deb", "b.txt")})
+        self.assertEqual(upstream.find_asset(rel, "b.txt").name, "b.txt")
+        self.assertEqual(upstream.find_asset(rel, "a_24*.deb").name, "a_24.04.deb")
+        with self.assertRaises(upstream.UpstreamError):
+            upstream.find_asset(rel, "a_*.deb")  # ambiguous
+        with self.assertRaises(upstream.UpstreamError):
+            upstream.find_asset(rel, "zzz*")
+
+    def test_tag_with_dashes_becomes_a_valid_version(self):
+        self.assertEqual(debbuild.upstream_version("1.3.1-0-ppa2"), "1.3.1.0.ppa2")
+        self.assertEqual(debbuild.upstream_version("v2026.10.26"), "2026.10.26")
+
+
+class AdoptDeb(unittest.TestCase):
+    def test_dependency_override_keeps_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            root = tmp / "r"
+            (root / "DEBIAN").mkdir(parents=True)
+            (root / "usr/bin").mkdir(parents=True)
+            (root / "usr/bin/x").write_text("x")
+            (root / "DEBIAN/control").write_text(
+                "Package: x\nVersion: 1.0-1\nArchitecture: amd64\nMaintainer: m\nDepends: libc6\n"
+                "Provides: x-terminal-emulator\nDescription: d\n long\n")
+            src = tmp / "x.deb"
+            subprocess.run(["dpkg-deb", "--root-owner-group", "-b", str(root), str(src)], check=True, capture_output=True)
+            rec = recipe.parse_recipe({"name": "x", "license": "MIT", "source": {"repo": "a/b"},
+                                       "build": {"kind": "deb"}, "assets": {"amd64": "x.deb"},
+                                       "package": {"depends": "libc6 (>= 2.38)"}})
+            out, version = debbuild.adopt_deb(rec, "amd64", src, tmp / "pool", 0)
+            self.assertEqual(version, "1.0-1")
+            self.assertEqual(debbuild.control_field(out, "Depends"), "libc6 (>= 2.38)")
+            self.assertEqual(debbuild.control_field(out, "Provides"), "x-terminal-emulator")
+            self.assertEqual(debbuild.control_field(out, "Description").splitlines()[0], "d")
+            self.assertIn("./usr/bin/x", subprocess.run(["dpkg-deb", "-c", str(out)], capture_output=True, text=True).stdout)
+
+
+class ArchAll(unittest.TestCase):
+    def test_all_package_is_listed_in_every_architecture(self):
+        s = repo.empty_state()
+        repo.add_version(
+            s, name="tool", homepage="h", license="MIT", version="1-1", upstream_version="1", source="s",
+            released="", arches={"all": {"filename": "pool/main/t/tool/tool_1-1_all.deb", "size": 1, "md5": "m",
+                                         "sha1": "s", "sha256": "h",
+                                         "control": "Package: tool\nVersion: 1-1\nArchitecture: all\nDescription: d"}})
+        for arch in ("amd64", "arm64"):
+            self.assertIn("tool_1-1_all.deb", repo.render_packages(s, arch).decode())
+
+
 class PublishFlow(unittest.TestCase):
     """Full publish against a fake upstream and a directory bucket."""
 

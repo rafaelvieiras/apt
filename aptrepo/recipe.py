@@ -6,8 +6,8 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-KINDS = ("deb", "tarball")
-ARCHES = ("amd64", "arm64")
+KINDS = ("deb", "tarball", "files")
+ARCHES = ("amd64", "arm64", "all")  # "all" = architecture-independent
 
 
 class RecipeError(ValueError):
@@ -26,6 +26,8 @@ class Recipe:
     license_path: str = ""  # path of the licence file inside the upstream repo
     package: dict = field(default_factory=dict)  # control fields (tarball kind)
     companions: tuple[dict, ...] = ()  # empty transitional packages that depend on this one
+    files: tuple[dict, ...] = ()  # kind "files": which upstream file goes where
+    extra_assets: tuple[str, ...] = ()  # kind "files": more arch-independent assets (man pages...)
 
 
 def _need(data: dict, key: str, where: str):
@@ -49,15 +51,30 @@ def parse_recipe(data: dict, where: str = "recipe") -> Recipe:
         if arch not in ARCHES:
             raise RecipeError(f"{where}: unsupported architecture {arch!r} (use {ARCHES})")
     package = dict(data.get("package", {}))
-    if kind == "tarball":
+    if kind in ("tarball", "files"):
         for key in ("description", "section"):
             _need(package, key, f"{where} [package]")
+    files = tuple(dict(f) for f in data.get("file", []))
+    if kind == "files":
+        if not files:
+            raise RecipeError(f"{where}: kind 'files' needs at least one [[file]]")
+        for f in files:
+            _need(f, "src", f"{where} [[file]]")
+            dest = str(_need(f, "dest", f"{where} [[file]]"))
+            if not dest.startswith("/usr/") or ".." in Path(dest).parts:
+                raise RecipeError(f"{where}: [[file]] dest must be an absolute path under /usr/: {dest!r}")
+    elif files:
+        raise RecipeError(f"{where}: [[file]] is only valid with kind 'files'")
+    if "all" in assets and len(assets) != 1:
+        raise RecipeError(f"{where}: assets.all cannot be mixed with per-architecture assets")
     companions = tuple(dict(c) for c in data.get("companion", []))
     for c in companions:
         for key in ("name", "description"):
             _need(c, key, f"{where} [[companion]]")
     return Recipe(
         companions=companions,
+        files=files,
+        extra_assets=tuple(build.get("extra_assets", ())),
         name=name,
         license=str(_need(data, "license", where)),
         homepage=str(data.get("homepage", f"https://github.com/{repo}")),

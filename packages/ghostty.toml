@@ -1,0 +1,24 @@
+name = "ghostty"
+# Ghostty's own licence. The .deb comes from a community build, see below.
+license = "MIT"
+homepage = "https://ghostty.org"
+
+# Ghostty publishes no Linux binaries. mkasberg/ghostty-ubuntu is the community
+# project that builds .debs from the official source; it is what the PPA uses.
+[source]
+type = "github-release"
+repo = "mkasberg/ghostty-ubuntu"
+
+[build]
+kind = "deb"
+revision = 1
+
+# The 24.04 build also runs on Ubuntu 26.04 and Debian 13 (tested). Upstream only
+# declares "libc6", but the binary needs glibc 2.38, so Debian 12 and Ubuntu 22.04
+# installed it fine and then failed at start-up. The Depends line below fixes that.
+[assets]
+amd64 = "ghostty_*_amd64_24.04.deb"
+arm64 = "ghostty_*_arm64_24.04.deb"
+
+[package]
+depends = "libadwaita-1-0, libc6 (>= 2.38), libfontconfig1, libfreetype6, libglib2.0-0t64 | libglib2.0-0, libgtk-4-1, libharfbuzz0b, libonig5, libx11-6"

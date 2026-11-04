@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import os
@@ -73,6 +74,17 @@ def latest_release(repo: str) -> Release:
             sha256=digest.split(":", 1)[1] if digest.startswith("sha256:") else None,
         )
     return Release(tag=data["tag_name"], published=data.get("published_at", ""), assets=assets)
+
+
+def find_asset(release: Release, pattern: str) -> Asset:
+    """The one asset whose name matches ``pattern`` (a name or an fnmatch glob)."""
+    if pattern in release.assets:
+        return release.assets[pattern]
+    hits = [a for n, a in release.assets.items() if fnmatch.fnmatchcase(n, pattern)]
+    if len(hits) != 1:
+        names = ", ".join(sorted(a.name for a in hits)) or "none"
+        raise UpstreamError(f"release {release.tag}: {pattern!r} matched {len(hits)} assets ({names})")
+    return hits[0]
 
 
 def sha256_file(path: Path) -> str:

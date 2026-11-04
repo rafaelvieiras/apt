@@ -134,7 +134,8 @@ def render_packages(state: dict, arch: str) -> bytes:
     for name in sorted(state["packages"]):
         entry = state["packages"][name]
         for version in sorted(entry["versions"], key=debversion.sort_key, reverse=True):
-            info = entry["versions"][version]["arch"].get(arch)
+            arches = entry["versions"][version]["arch"]
+            info = arches.get(arch) or arches.get("all")  # arch-independent: listed everywhere
             if not info:
                 continue
             stanzas.append(

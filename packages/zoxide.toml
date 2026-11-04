@@ -1,0 +1,49 @@
+name = "zoxide"
+license = "MIT"
+homepage = "https://github.com/ajeetdsouza/zoxide"
+
+[source]
+type = "github-release"
+repo = "ajeetdsouza/zoxide"
+
+[build]
+kind = "files"
+# Revision 2 so this sorts above the "0.10.0-1+noble" build that deb.griffo.io
+# shipped; with revision 1 the same upstream version would look like a downgrade.
+revision = 2
+license_path = "LICENSE"
+
+[assets]
+amd64 = "zoxide-*-x86_64-unknown-linux-musl.tar.gz"
+arm64 = "zoxide-*-aarch64-unknown-linux-musl.tar.gz"
+
+[[file]]
+src = "zoxide"
+dest = "/usr/bin/zoxide"
+
+[[file]]
+src = "man/man1/*.1"
+dest = "/usr/share/man/man1/"
+gzip = true
+
+[[file]]
+src = "completions/zoxide.bash"
+dest = "/usr/share/bash-completion/completions/zoxide"
+
+[[file]]
+src = "completions/zoxide.fish"
+dest = "/usr/share/fish/vendor_completions.d/zoxide.fish"
+
+[[file]]
+src = "completions/_zoxide"
+dest = "/usr/share/zsh/vendor-completions/_zoxide"
+
+[package]
+section = "utils"
+description = """\
+Smarter cd command that learns your habits
+zoxide remembers which directories you use most and lets you jump to them
+with a few keystrokes. It works with bash, zsh, fish and many other shells.
+.
+This package is the official upstream release (static build), repackaged
+without changes."""

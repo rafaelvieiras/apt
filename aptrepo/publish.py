@@ -42,7 +42,7 @@ class Result:
 
 def _expected_version(recipe: Recipe, release: upstream.Release) -> str | None:
     """Debian version for tarball recipes; ``None`` for upstream .debs (read after download)."""
-    if recipe.kind == "tarball":
+    if recipe.kind in ("tarball", "files"):
         return f"{debbuild.upstream_version(release.tag)}-{recipe.revision}"
     return None
 
@@ -69,21 +69,33 @@ def _build(plan: Plan, release: upstream.Release, workdir: Path) -> dict[str, tu
     licenses.check(recipe.license)
     built: dict[str, tuple[Path, str]] = {}
     license_text = ""
-    if recipe.kind == "tarball":
+    if recipe.kind in ("tarball", "files"):
         if not recipe.license_path:
-            raise debbuild.BuildError(f"{recipe.name}: build.license_path is required for tarball recipes")
+            raise debbuild.BuildError(f"{recipe.name}: build.license_path is required for {recipe.kind} recipes")
         license_text = upstream.fetch_text(
             f"https://raw.githubusercontent.com/{recipe.repo}/{release.tag}/{recipe.license_path}"
         )
     epoch = _epoch(release.published)
-    for arch, asset_name in recipe.assets.items():
-        asset = release.assets.get(asset_name)
-        if asset is None:
-            raise debbuild.BuildError(f"{recipe.name}: release {release.tag} has no asset {asset_name!r}")
-        raw = workdir / f"dl-{arch}-{asset_name}"
+
+    def fetch(arch: str, pattern: str) -> tuple[str, Path]:
+        asset = upstream.find_asset(release, pattern)
+        raw = workdir / f"dl-{arch}-{asset.name}"
         upstream.download(asset, raw)
+        return asset.name, raw
+
+    for arch, pattern in recipe.assets.items():
+        asset_name, raw = fetch(arch, pattern)
         if recipe.kind == "deb":
-            deb, version = debbuild.adopt_deb(recipe, arch, raw, workdir / "out")
+            deb, version = debbuild.adopt_deb(recipe, arch, raw, workdir / "out", epoch)
+        elif recipe.kind == "files":
+            downloaded = {pattern: (asset_name, raw)}
+            for extra in recipe.extra_assets:
+                downloaded[extra] = fetch(arch, extra)
+            version = plan.version
+            deb = debbuild.build_from_files(
+                recipe, arch, debbuild.upstream_version(release.tag), downloaded, license_text,
+                workdir / "out", epoch,
+            )
         else:
             deb = debbuild.build_from_tarball(
                 recipe, arch, debbuild.upstream_version(release.tag), raw, license_text,

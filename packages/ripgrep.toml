@@ -1,0 +1,52 @@
+name = "ripgrep"
+license = "MIT OR Unlicense"
+homepage = "https://github.com/BurntSushi/ripgrep"
+
+[source]
+type = "github-release"
+repo = "BurntSushi/ripgrep"
+
+[build]
+kind = "files"
+revision = 1
+license_path = "LICENSE-MIT"
+
+# musl builds are static, so one package runs on every Debian and Ubuntu release.
+[assets]
+amd64 = "ripgrep-*-x86_64-unknown-linux-musl.tar.gz"
+arm64 = "ripgrep-*-aarch64-unknown-linux-musl.tar.gz"
+
+[[file]]
+src = "*/rg"
+dest = "/usr/bin/rg"
+
+[[file]]
+src = "*/doc/rg.1"
+dest = "/usr/share/man/man1/rg.1"
+gzip = true
+
+[[file]]
+src = "*/complete/rg.bash"
+dest = "/usr/share/bash-completion/completions/rg"
+
+[[file]]
+src = "*/complete/rg.fish"
+dest = "/usr/share/fish/vendor_completions.d/rg.fish"
+
+[[file]]
+src = "*/complete/_rg"
+dest = "/usr/share/zsh/vendor-completions/_rg"
+
+[[file]]
+src = "*/doc/GUIDE.md"
+dest = "/usr/share/doc/ripgrep/GUIDE.md"
+
+[package]
+section = "utils"
+description = """\
+Recursively search directories for a regex pattern
+ripgrep (rg) is a line-oriented search tool that respects gitignore rules
+and skips hidden and binary files by default. It is fast.
+.
+This package is the official upstream release (static build), repackaged
+without changes."""

@@ -1,0 +1,56 @@
+name = "yt-dlp"
+license = "Unlicense"
+homepage = "https://github.com/yt-dlp/yt-dlp"
+
+[source]
+type = "github-release"
+repo = "yt-dlp/yt-dlp"
+
+[build]
+kind = "files"
+revision = 1
+license_path = "LICENSE"
+# The man page and completions are only in the source tarball.
+extra_assets = ["yt-dlp.tar.gz"]
+
+# The zipapp is one Python file. It uses the system python3, like Debian's package.
+[assets]
+all = "yt-dlp"
+
+[[file]]
+src = "yt-dlp"
+dest = "/usr/bin/yt-dlp"
+
+[[file]]
+from = "yt-dlp.tar.gz"
+src = "yt-dlp/yt-dlp.1"
+dest = "/usr/share/man/man1/yt-dlp.1"
+gzip = true
+
+[[file]]
+from = "yt-dlp.tar.gz"
+src = "yt-dlp/completions/bash/yt-dlp"
+dest = "/usr/share/bash-completion/completions/yt-dlp"
+
+[[file]]
+from = "yt-dlp.tar.gz"
+src = "yt-dlp/completions/fish/yt-dlp.fish"
+dest = "/usr/share/fish/vendor_completions.d/yt-dlp.fish"
+
+[[file]]
+from = "yt-dlp.tar.gz"
+src = "yt-dlp/completions/zsh/_yt-dlp"
+dest = "/usr/share/zsh/vendor-completions/_yt-dlp"
+
+[package]
+section = "web"
+# 2026.10 refuses to start below Python 3.11 (Ubuntu 22.04 ships 3.10).
+depends = "python3 (>= 3.11)"
+recommends = "ca-certificates, ffmpeg"
+suggests = "aria2 | wget | curl, deno | nodejs, python3-brotli, python3-mutagen, python3-pycryptodome, python3-secretstorage, python3-websockets"
+description = """\
+Download videos from YouTube and many other sites
+yt-dlp is a fork of youtube-dl with additional features and fixes.
+Sites change often, so keep it up to date.
+.
+This package is the official upstream zipapp release, repackaged without changes."""

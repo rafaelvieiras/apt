@@ -51,6 +51,42 @@ The tarball must contain a single top-level directory with `bin/`, `lib/`, `shar
 inside; they are installed under `/usr`. `{version}` and `{deb_version}` work in
 `depends`, `replaces` and the other relationship fields.
 
+## Upstream ships a binary or an odd archive layout
+
+Use `kind = "files"`: say which upstream file goes where. `src` is a glob inside the
+archive and must match exactly one file, unless `dest` ends with `/` (then it copies every match).
+Anything not listed is not shipped. `dest` must be under `/usr/`.
+
+```toml
+[build]
+kind = "files"
+license_path = "LICENSE"
+
+[assets]
+amd64 = "tool-*-linux-amd64.tar.gz"     # globs must match exactly one asset
+
+[[file]]
+src = "*/bin/tool"
+dest = "/usr/bin/tool"                  # executables under /usr/bin are 0755
+
+[[file]]
+src = "*/man/*.1"
+dest = "/usr/share/man/man1/"
+gzip = true                             # man pages are shipped gzipped
+```
+
+- A single non-archive asset (a script, a static binary) is addressed by its own name.
+- `from = "<asset pattern>"` takes a file from an extra asset listed in `build.extra_assets`.
+- A package that is the same on every architecture uses `all = "<asset>"` instead of `amd64`/`arm64`.
+- If another repository once shipped the same upstream version with a higher Debian revision
+  (for example `0.10.0-1+noble`), set `revision` high enough to sort above it, or `apt upgrade` sees a downgrade.
+
+## Fixing the dependencies of an upstream `.deb`
+
+Add `[package]` with `depends`, `recommends`, `provides`, ... to a `kind = "deb"` recipe. Those fields replace
+the ones in the `.deb`; the files are untouched. Use it when the upstream package under-declares a requirement
+(for example a missing `libc6 (>= 2.38)`).
+
 ### Replacing a distribution package
 
 If Debian/Ubuntu already ship the package, our version must win a plain
