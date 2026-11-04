@@ -1,6 +1,9 @@
 name: Publish
 
 # Checks upstream every 6 hours. Does nothing, and costs nothing, when upstream has not moved.
+# The landing site (site/, Astro) is rebuilt and uploaded after the packages, but only when
+# something changed that it shows: new packages, a push that touches the site or the code,
+# or a manual run with force_site / force_index.
 on:
   schedule:
     - cron: "17 */6 * * *"
@@ -14,9 +17,13 @@ on:
         description: "Re-render and re-sign the index even if nothing changed"
         type: boolean
         default: false
+      force_site:
+        description: "Rebuild and upload the landing site even if no package changed"
+        type: boolean
+        default: false
   push:
     branches: [main]
-    paths: ["packages/**", "repo.toml", "keys/**", "aptrepo/**"]
+    paths: ["packages/**", "repo.toml", "keys/**", "aptrepo/**", "site/**"]
 
 # One publish at a time: two runs would race on index.json.
 concurrency:
@@ -42,6 +49,7 @@ jobs:
           python -m aptrepo check
           python -m unittest discover -s tests -t .
       - name: Publish
+        id: publish
         env:
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
           APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
@@ -57,4 +65,48 @@ jobs:
           args=(publish --storage r2)
           [ "$FORCE_INDEX" = "true" ] && args+=(--force-index)
           [ -n "$PACKAGE" ] && args+=("$PACKAGE")
-          python -m aptrepo "${args[@]}"
+          set +e
+          python -m aptrepo "${args[@]}" | tee "$RUNNER_TEMP/publish.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          # The last line is "published=N skipped=N errors=N". Export N so the site step can decide.
+          echo "published=$(sed -n 's/^published=\([0-9]*\) .*/\1/p' "$RUNNER_TEMP/publish.log" | tail -1)" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      # Decide whether the landing site needs a rebuild. It does when packages were published
+      # (it shows them), and also when the push touched the site or the code even though no
+      # package changed: a redesign must go live without forcing the index.
+      - name: Decide on the site
+        id: gate
+        if: ${{ !cancelled() && steps.publish.outputs.published != '' }}
+        env:
+          PUBLISHED: ${{ steps.publish.outputs.published }}
+          EVENT: ${{ github.event_name }}
+          FORCE_SITE: ${{ github.event.inputs.force_site }}
+          FORCE_INDEX: ${{ github.event.inputs.force_index }}
+        run: |
+          if [ "$PUBLISHED" != "0" ] || [ "$EVENT" = "push" ] || [ "$FORCE_SITE" = "true" ] || [ "$FORCE_INDEX" = "true" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "Landing site unchanged: nothing published and no site change."
+          fi
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: ${{ !cancelled() && steps.gate.outputs.build == 'true' }}
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      # Exports site-data.json from the published index.json, runs `npm ci && npm run build`
+      # in site/ and uploads site/dist/ (refuses apt paths and sample-data builds).
+      - name: Build and upload the site
+        if: ${{ !cancelled() && steps.gate.outputs.build == 'true' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+          PYTHONUNBUFFERED: "1"
+        run: python -m aptrepo publish-site --storage r2
