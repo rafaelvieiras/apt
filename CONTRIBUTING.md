@@ -14,12 +14,19 @@ redistribution, and no up-to-date package in Debian or Ubuntu.
 Follow [docs/adding-a-package.md](docs/adding-a-package.md) and open a PR. CI runs
 the recipe check and the unit tests.
 
+## Work on the landing site
+
+The site lives in [`site/`](site/) (Astro, Node 22.12+). `cd site && npm ci && npm run dev` serves it
+from `src/data/sample.json`; see [AGENTS.md](AGENTS.md) for the export and publish commands. Keep it
+dependency-free at runtime: no UI framework, no web fonts, no external requests, and it must work with
+JavaScript disabled. CI builds it on every pull request.
+
 ## Conventions
 
 - **Language.** Code, comments, docs and commits are in **English**.
 - **Commits** follow [Conventional Commits](https://www.conventionalcommits.org/):
   `feat(recipe): ...`, `fix(publish): ...`, `docs: ...`.
-- Standard library only for the tooling.
+- Standard library only for the Python tooling.
 
 ## Reporting issues
 

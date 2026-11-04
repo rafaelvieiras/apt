@@ -47,7 +47,7 @@ files such as `Release` by default.
 Do **not** enable Cache Reserve (it is paid). Cache Rules and Transform Rules are free
 (10 of each on the Free plan).
 
-### Landing page on `/` (optional)
+### Landing site on `/` (optional)
 
 R2 does not serve `index.html` for `/`. Add a Transform Rule (Rules → Transform Rules →
 Rewrite URL) with the filter `(http.host eq "apt.rafaelvieiras.com" and http.request.uri.path eq "/")`
@@ -55,6 +55,24 @@ and **Rewrite path** to the static value `/index.html`.
 
 Both conditions are required. With the path condition missing, every URL is rewritten to the
 landing page and `apt update` breaks.
+
+This is the **only** rule the site needs. The second page, `/packages`, is uploaded twice by
+`python -m aptrepo upload-site`: as `packages.html` and as the extensionless object `packages`
+(`Content-Type: text/html; charset=utf-8`). R2 serves exact keys, so `/packages` resolves with no
+rewrite rule. Any future page gets the same treatment automatically. Only `/` is special, because no object
+has an empty name.
+
+The site is built from `site/` (Astro) and published by the workflow after the packages. To do
+it by hand with the same credentials as the publish step:
+
+```bash
+export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... R2_BUCKET=apt R2_ENDPOINT=https://<account id>.r2.cloudflarestorage.com
+python -m aptrepo publish-site --storage r2
+```
+
+The uploader refuses keys that could shadow apt (`dists/`, `pool/`, `key.*`, `index.json`) and
+refuses a build made from the sample data. Hashed files under `_astro/` (if any; the CSS and JS are
+inlined today) are cached for a year, everything else for five minutes.
 
 ## 3. R2 API token
 
@@ -81,6 +99,10 @@ Pull requests from forks cannot read these secrets. Keep it that way: do not use
 ```bash
 gh workflow run publish.yml
 ```
+
+The run publishes the packages and then builds and uploads the landing site. To republish only the
+site, run `gh workflow run publish.yml -f force_site=true`. A push that touches `site/**` does it
+on its own, even when no package changed.
 
 ## Verify
 
@@ -111,5 +133,5 @@ for i in 1 2; do curl -s -D - -o /dev/null https://apt.rafaelvieiras.com/index.j
 ## Rotating the key
 
 Generate a new key, replace `keys/rafaelvieiras-apt.asc` and the `APT_GPG_*` secrets,
-then run the workflow with `force_index`. Announce it in `SECURITY.md`; clients must
+then run the workflow with `force_index` (that also rebuilds the site, which shows the new fingerprint). Announce it in `SECURITY.md`; clients must
 re-download `key.gpg`.

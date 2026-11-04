@@ -25,7 +25,9 @@ sudo apt update && sudo apt install neovim yazi   # or any package from the tabl
 
 One suite (`stable`) serves every Debian and Ubuntu release, because the packages
 are static or only need an old glibc. Architectures: `amd64`, `arm64`.
-The catalogue is also published as [`index.json`](https://apt.rafaelvieiras.com/index.json).
+The landing page and the full package list are at <https://apt.rafaelvieiras.com> and
+<https://apt.rafaelvieiras.com/packages>. The catalogue is also published as
+[`index.json`](https://apt.rafaelvieiras.com/index.json).
 
 | Package | Source | How |
 |---|---|---|
@@ -84,6 +86,22 @@ python -m aptrepo publish --storage dir:/tmp/bucket --config repo.toml   # local
 
 Python 3.11+, standard library only. External tools: `gpg`, `dpkg-deb`, and the
 `aws` CLI (R2 uploads only).
+
+### Landing site
+
+The site in [`site/`](site/) is a static [Astro](https://astro.build) project: two pages (Home and
+Packages), no client framework, no external requests, and it works with JavaScript off. Node 22.12+ is only
+needed for the site, never for packages.
+
+```bash
+python -m aptrepo site-data --storage r2      # export the published state to site/src/data/site-data.json
+cd site && npm ci && npm run dev              # live preview; uses src/data/sample.json when there is no export
+npm run build                                 # static output in site/dist
+cd .. && python -m aptrepo publish-site --storage r2   # export + build + upload (what CI runs)
+```
+
+`site-data.json` is the only contract between Python and Astro; see `aptrepo/site.py`. The pages are
+uploaded after the packages, and a push that only touches `site/**` republishes them.
 
 ## License
 
