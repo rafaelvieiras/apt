@@ -104,9 +104,22 @@ class R2Storage:
                 raise RuntimeError(f"{var} is not set")
 
     def _aws(self, args: list[str], check: bool = True) -> subprocess.CompletedProcess:
-        env = dict(os.environ, AWS_DEFAULT_REGION="auto", AWS_EC2_METADATA_DISABLED="true")
-        cmd = ["aws", "--endpoint-url", self.endpoint, *args]
-        proc = subprocess.run(cmd, capture_output=True, env=env)
+        env = dict(
+            os.environ,
+            AWS_DEFAULT_REGION="auto",
+            AWS_EC2_METADATA_DISABLED="true",
+            # Recent CLIs add CRC checksums that R2 does not always accept.
+            AWS_REQUEST_CHECKSUM_CALCULATION="when_required",
+            AWS_RESPONSE_CHECKSUM_VALIDATION="when_required",
+            AWS_MAX_ATTEMPTS="3",
+            AWS_RETRY_MODE="standard",
+        )
+        cmd = ["aws", "--endpoint-url", self.endpoint, "--cli-connect-timeout", "15",
+               "--cli-read-timeout", "120", *args]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, env=env, stdin=subprocess.DEVNULL, timeout=600)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"aws {args[0]} {args[1]} timed out") from None
         if check and proc.returncode != 0:
             raise RuntimeError(f"aws {args[0]} {args[1]} failed: {proc.stderr.decode(errors='replace').strip()}")
         return proc
