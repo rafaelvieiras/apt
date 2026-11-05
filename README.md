@@ -20,7 +20,7 @@ sudo apt install neovim yazi                                                   #
 ```
 
 Add `--dry-run` to see every step without changing anything, or download the file and read it first.
-By hand, the same thing is three commands:
+By hand, the script is the key and source commands below; the last line is yours to run:
 
 ```bash
 sudo install -d -m 0755 /etc/apt/keyrings
