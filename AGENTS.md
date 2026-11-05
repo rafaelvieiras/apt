@@ -24,6 +24,7 @@ aptrepo/
   site.py       site-data.json export for the landing site, and its uploader
   cli.py        python -m aptrepo {check,plan,publish,site-data,upload-site,publish-site}
 site/           Astro landing site (Home, Packages); Node only, never needed by aptrepo publish
+  site/public/setup.sh   the one-line installer served at /setup.sh (plain sh; copied verbatim into dist/)
 packages/       one recipe per upstream project
 repo.toml       repository identity
 keys/           PUBLIC key only

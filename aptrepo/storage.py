@@ -37,6 +37,7 @@ HTML = "text/html; charset=utf-8"
 _TYPES = {
     ".asc": "text/plain; charset=utf-8",
     ".txt": "text/plain; charset=utf-8",
+    ".sh": "text/plain; charset=utf-8",  # shown in the browser, not downloaded
     ".deb": "application/vnd.debian.binary-package",
     ".gz": "application/octet-stream",
     ".xz": "application/octet-stream",

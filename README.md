@@ -10,6 +10,18 @@
 
 ## Use it
 
+The short way. [`setup.sh`](site/public/setup.sh) adds the key and the source, checks the key
+fingerprint, and installs any package you name:
+
+```bash
+curl -fsSL https://apt.rafaelvieiras.com/setup.sh | sudo sh                    # add the repository
+curl -fsSL https://apt.rafaelvieiras.com/setup.sh | sudo sh -s -- neovim yazi  # ...and install these
+curl -fsSL https://apt.rafaelvieiras.com/setup.sh | sudo sh -s -- --uninstall  # remove it again
+```
+
+Add `--dry-run` to see every step without changing anything, or download the file and read it first.
+By hand, the same thing is three commands:
+
 ```bash
 sudo install -d -m 0755 /etc/apt/keyrings
 sudo curl -fsSL https://apt.rafaelvieiras.com/key.gpg -o /etc/apt/keyrings/rafaelvieiras-apt.gpg

@@ -133,5 +133,6 @@ for i in 1 2; do curl -s -D - -o /dev/null https://apt.rafaelvieiras.com/index.j
 ## Rotating the key
 
 Generate a new key, replace `keys/rafaelvieiras-apt.asc` and the `APT_GPG_*` secrets,
+also update `FINGERPRINT` and `KEY_SHA256` in `site/public/setup.sh` (a unit test fails until they match the new key),
 then run the workflow with `force_index` (that also rebuilds the site, which shows the new fingerprint). Announce it in `SECURITY.md`; clients must
 re-download `key.gpg`.

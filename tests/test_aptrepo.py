@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import re
@@ -625,6 +626,79 @@ class SiteCli(unittest.TestCase):
             (dist / "key.gpg").write_text("evil")
             self.assertEqual(cli.main(["upload-site", str(dist), "--storage", f"dir:{tmp / 'b'}"]), 1)
             self.assertFalse((tmp / "b" / "key.gpg").exists())
+
+
+class SetupScript(unittest.TestCase):
+    """site/public/setup.sh repeats a few repository facts; they must not drift."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    SCRIPT = (ROOT / "site" / "public" / "setup.sh").read_text()
+
+    def value(self, name):
+        found = re.search(rf'^{name}="(?:\$\{{[A-Z_]+:-)?([^"}}]*)\}}?"', self.SCRIPT, re.M)
+        self.assertIsNotNone(found, f"{name} not found in setup.sh")
+        return found.group(1)
+
+    def config(self):
+        import tomllib
+
+        with (self.ROOT / "repo.toml").open("rb") as fh:
+            return repo.RepoConfig.from_toml(tomllib.load(fh))
+
+    def test_repository_facts_match_repo_toml(self):
+        cfg = self.config()
+        self.assertEqual(self.value("BASE_URL"), cfg.base_url)
+        self.assertEqual(self.value("SUITE"), cfg.suite)
+        self.assertEqual(self.value("COMPONENT"), cfg.component)
+
+    def test_key_pins_match_the_committed_key(self):
+        armored = (self.ROOT / "keys" / "rafaelvieiras-apt.asc").read_bytes()
+        self.assertEqual(self.value("FINGERPRINT"), sign.public_fingerprint(armored))
+        self.assertEqual(self.value("KEY_SHA256"), hashlib.sha256(sign.dearmor(armored)).hexdigest())
+
+    def test_paths_match_the_site_and_the_docs(self):
+        self.assertEqual(self.value("KEYRING"), "/etc/apt/keyrings/rafaelvieiras-apt.gpg")
+        self.assertEqual(self.value("SOURCES"), "/etc/apt/sources.list.d/rafaelvieiras-apt.sources")
+        lib = (self.ROOT / "site" / "src" / "lib" / "site.ts").read_text()
+        self.assertIn(self.value("KEYRING"), lib)
+        self.assertIn(self.value("SOURCES"), lib)
+
+    def test_is_posix_sh_and_executable(self):
+        self.assertTrue(self.SCRIPT.startswith("#!/bin/sh\n"))
+        self.assertIn("set -eu", self.SCRIPT)
+        self.assertNotIn("[[", self.SCRIPT)
+        self.assertTrue((self.ROOT / "site" / "public" / "setup.sh").stat().st_mode & 0o111)
+
+    def test_runs_nothing_before_the_last_line(self):
+        last = [line for line in self.SCRIPT.splitlines() if line.strip()][-1]
+        self.assertEqual(last, 'main "$@"')
+        self.assertEqual(self.SCRIPT.count('main "$@"'), 1)
+
+    def test_is_served_as_text_with_a_short_cache(self):
+        self.assertEqual(storage.content_type("setup.sh"), "text/plain; charset=utf-8")
+        self.assertEqual(storage.cache_control("setup.sh"), storage.SHORT)
+
+    def test_upload_plan_includes_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dist = Path(tmp)
+            (dist / "index.html").write_bytes(b"<h1>home")
+            (dist / "setup.sh").write_bytes(b"#!/bin/sh\n")
+            self.assertIn("setup.sh", [key for key, _, _ in site.plan_upload(dist)])
+
+    def test_dry_run_changes_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {"PATH": "/usr/bin:/bin", "HOME": tmp, "TMPDIR": tmp, "NO_COLOR": "1"}
+            done = subprocess.run(["sh", str(self.ROOT / "site" / "public" / "setup.sh"), "--dry-run", "neovim"],
+                                  capture_output=True, text=True, env=env, timeout=30)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertIn("apt-get install -y neovim", done.stderr)
+            self.assertEqual(list(Path(tmp).iterdir()), [], "dry run must leave no temporary files behind")
+
+    def test_rejects_hostile_package_names(self):
+        for name in ("a;rm -rf /", "$(id)", "-x", "A", "x y"):
+            done = subprocess.run(["sh", str(self.ROOT / "site" / "public" / "setup.sh"), "--dry-run", "--", name],
+                                  capture_output=True, text=True, timeout=30)
+            self.assertNotEqual(done.returncode, 0, name)
 
 
 class RecipeNote(unittest.TestCase):

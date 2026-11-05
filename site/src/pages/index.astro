@@ -44,7 +44,7 @@ const flow = [
             <li><b>{CHECK_HOURS} h</b><span>update check</span></li>
           </ul>
         </div>
-        <Terminal title="bash" code={cmd.all} label="Copy the complete install snippet" />
+        <Terminal title="bash" code={cmd.hero} label="Copy the install commands" />
       </div>
     </div>
   </div>
@@ -60,6 +60,13 @@ const flow = [
 
   <Section id="install" eyebrow="Install" title="Three steps, about a minute" alt>
     <p slot="sub">Run these as a normal user; they call <code>sudo</code> where needed. Works on current Debian and Ubuntu releases.</p>
+    <div class="quick">
+      <h3>The short way</h3>
+      <p>One script does all three steps below. It checks the key fingerprint before it trusts anything, and it only touches the two files named below. <a href="/setup.sh">Read it first</a>; it is under 300 lines of plain <code>sh</code>.</p>
+      <Command command={cmd.quick} label="Copy the one-line installer" />
+      <p class="mut small">Add package names to install them at once: <code>sudo sh -s -- neovim yazi</code>. Preview without changing anything with <code>--dry-run</code>.</p>
+    </div>
+    <p class="manual">Prefer to do it by hand? Same result, three commands:</p>
     <ol class="steps">
       <li>
         <div>
@@ -197,6 +204,11 @@ const flow = [
   .os ul { margin: .6rem 0 0; padding-left: 1.1rem; color: var(--mut); font-size: .93rem; }
 
   /* install steps */
+  .quick { max-width: 46rem; margin: 0 0 2rem; padding: 1.2rem 1.3rem; border: 1px solid var(--line); border-radius: 12px; background: var(--card); display: grid; gap: .8rem; }
+  .quick h3 { font-size: 1.15rem; }
+  .quick p { margin: 0; color: var(--mut); }
+  .quick .small { font-size: .88rem; }
+  .manual { margin: 0 0 1.4rem; color: var(--mut); }
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2rem; counter-reset: s; }
   .steps > li { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); counter-increment: s; }
   @media (min-width: 62rem) { .steps > li { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 2.5rem; align-items: start; } }

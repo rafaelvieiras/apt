@@ -21,6 +21,18 @@ jobs:
       - name: Unit tests
         run: python -m unittest discover -s tests -t . -v
 
+  # The installer is piped into `sudo sh`, so it gets a linter and a real-distro dry run.
+  setup-script:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: shellcheck
+        run: shellcheck --shell=sh site/public/setup.sh
+      - name: POSIX syntax (dash)
+        run: dash -n site/public/setup.sh
+      - name: Dry run
+        run: sh site/public/setup.sh --dry-run neovim
+
   # The landing site must always build, against sample data (no R2, no secrets).
   site:
     runs-on: ubuntu-24.04
