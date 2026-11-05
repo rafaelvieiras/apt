@@ -69,23 +69,26 @@ jobs:
           python -m aptrepo "${args[@]}" | tee "$RUNNER_TEMP/publish.log"
           status=${PIPESTATUS[0]}
           set -e
-          # The last line is "published=N skipped=N errors=N". Export N so the site step can decide.
+          # The last line is "published=N skipped=N errors=N refreshed=N". Export N so the site step can decide.
           echo "published=$(sed -n 's/^published=\([0-9]*\) .*/\1/p' "$RUNNER_TEMP/publish.log" | tail -1)" >> "$GITHUB_OUTPUT"
+          echo "refreshed=$(sed -n 's/^published=.* refreshed=\([0-9]*\)$/\1/p' "$RUNNER_TEMP/publish.log" | tail -1)" >> "$GITHUB_OUTPUT"
           exit "$status"
 
       # Decide whether the landing site needs a rebuild. It does when packages were published
-      # (it shows them), and also when the push touched the site or the code even though no
-      # package changed: a redesign must go live without forcing the index.
+      # or a recipe's note, link or licence changed (the site shows them), and also when the
+      # push touched the site or the code even though no package changed: a redesign must go
+      # live without forcing the index.
       - name: Decide on the site
         id: gate
         if: ${{ !cancelled() && steps.publish.outputs.published != '' }}
         env:
           PUBLISHED: ${{ steps.publish.outputs.published }}
+          REFRESHED: ${{ steps.publish.outputs.refreshed }}
           EVENT: ${{ github.event_name }}
           FORCE_SITE: ${{ github.event.inputs.force_site }}
           FORCE_INDEX: ${{ github.event.inputs.force_index }}
         run: |
-          if [ "$PUBLISHED" != "0" ] || [ "$EVENT" = "push" ] || [ "$FORCE_SITE" = "true" ] || [ "$FORCE_INDEX" = "true" ]; then
+          if [ "$PUBLISHED" != "0" ] || [ "${REFRESHED:-0}" != "0" ] || [ "$EVENT" = "push" ] || [ "$FORCE_SITE" = "true" ] || [ "$FORCE_INDEX" = "true" ]; then
             echo "build=true" >> "$GITHUB_OUTPUT"
           else
             echo "build=false" >> "$GITHUB_OUTPUT"

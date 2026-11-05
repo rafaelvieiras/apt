@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `publish` now compares the homepage, licence and `note` of every recipe with the published state. When
+  only one of them changed, it rewrites `index.json` and the workflow rebuilds the site, so editing a note
+  goes live without `force_index`. The summary line gains `refreshed=N`.
 - `setup.sh`: a POSIX `sh` installer served at `/setup.sh`. It verifies the signing key (fingerprint
   with `gpg`, checksum without), writes the keyring and the DEB822 source, and refreshes
   only that source. It never installs a package. Supports `--dry-run`, `--no-update` and

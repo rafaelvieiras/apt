@@ -63,6 +63,7 @@ def cmd_publish(args: argparse.Namespace) -> int:
     )
     print(
         f"published={len(result.published)} skipped={len(result.skipped)} errors={len(result.errors)}"
+        f" refreshed={len(result.refreshed)}"
     )
     # A failing package must not block the others, but the run still has to go red.
     return 1 if result.errors else 0

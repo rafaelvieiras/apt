@@ -38,6 +38,7 @@ class Result:
     published: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    refreshed: list[str] = field(default_factory=list)  # recipe metadata changed, nothing was built
 
 
 def _expected_version(recipe: Recipe, release: upstream.Release) -> str | None:
@@ -205,15 +206,23 @@ def publish(
 
         if dry_run:
             return result
-        if not changed and not force_index:
+
+        # Homepage, licence and note live in the recipe. Editing them builds nothing, so
+        # compare them with the published state here: a changed note must reach the site
+        # without anyone forcing the index.
+        for recipe in recipes:
+            if recipe.name not in state["packages"]:
+                continue
+            if repo.set_metadata(state, recipe.name, homepage=recipe.homepage, license=recipe.license, note=recipe.note):
+                log(f"~ {recipe.name}: recipe metadata changed")
+                result.refreshed.append(recipe.name)
+
+        if not changed and not result.refreshed and not force_index:
             log("nothing to publish")
             return result
         if not private_key:
             raise sign.SignError("no signing key: set APT_GPG_PRIVATE_KEY")
 
-        for recipe in recipes:  # notes live in the recipe: refresh them even when nothing new was built
-            if recipe.name in state["packages"]:
-                repo.set_note(state, recipe.name, recipe.note)
         doomed = repo.prune(state, cfg.retain)
         state["generated"] = datetime.fromtimestamp(now or _now(), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         rendered = repo.render_dists(state, cfg, now=now)

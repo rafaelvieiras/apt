@@ -704,6 +704,24 @@ class SetupScript(unittest.TestCase):
             self.assertIn("unknown argument", done.stderr)
 
 
+class SetMetadata(unittest.TestCase):
+    def state(self):
+        state = repo.load_state(None)
+        repo.add_version(state, name="t", homepage="h", license="MIT", version="1-1", upstream_version="1",
+                         source="s", released="r", arches={"amd64": {"control": "Description: d", "filename": "f"}},
+                         note="n")
+        return state
+
+    def test_reports_whether_anything_changed(self):
+        state = self.state()
+        self.assertFalse(repo.set_metadata(state, "t", homepage="h", license="MIT", note="n"))
+        self.assertTrue(repo.set_metadata(state, "t", homepage="h2", license="MIT", note="n"))
+        self.assertTrue(repo.set_metadata(state, "t", homepage="h2", license="GPL", note="n"))
+        self.assertTrue(repo.set_metadata(state, "t", homepage="h2", license="GPL", note=""))
+        self.assertNotIn("note", state["packages"]["t"])
+        self.assertFalse(repo.set_metadata(state, "t", homepage="h2", license="GPL", note=""))
+
+
 class RecipeNote(unittest.TestCase):
     def test_note_is_parsed_stored_and_optional(self):
         base = {"name": "tool", "license": "MIT", "source": {"repo": "a/b"}, "build": {"kind": "deb"},
@@ -782,6 +800,70 @@ class PublishFlow(unittest.TestCase):
         second = self.run_publish()
         self.assertEqual((second.published, second.skipped), ([], ["tool"]))
         self.assertEqual(self.store.get("dists/stable/InRelease"), before, "no-op must not re-sign")
+
+    def edit_recipe(self, old, new):
+        path = self.dir / "packages" / "tool.toml"
+        text = path.read_text()
+        self.assertIn(old, text)
+        path.write_text(text.replace(old, new, 1))
+
+    def test_a_changed_note_is_published_without_forcing(self):
+        self.run_publish()
+        generated = json.loads(self.store.get("index.json"))["generated"]
+        self.edit_recipe('note="Needs nothing."', 'note="Needs less than nothing."')
+        again = self.run_publish(now=4_000_000_000)
+        self.assertEqual((again.published, again.refreshed), ([], ["tool"]))
+        state = json.loads(self.store.get("index.json"))
+        self.assertEqual(state["packages"]["tool"]["note"], "Needs less than nothing.")
+        self.assertNotEqual(state["generated"], generated, "index.json is rewritten, so the site sees the change")
+        # A note is not in the .deb, so the apt indexes are identical; they are still valid and signed.
+        sign.verify_clearsigned(self.pub, self.store.get("dists/stable/InRelease"))
+        third = self.run_publish()
+        self.assertEqual((third.refreshed, third.published), ([], []), "the second run has nothing left to refresh")
+
+    def test_removing_a_note_is_published_too(self):
+        self.run_publish()
+        self.edit_recipe('note="Needs nothing."\n', "")
+        again = self.run_publish()
+        self.assertEqual(again.refreshed, ["tool"])
+        self.assertNotIn("note", json.loads(self.store.get("index.json"))["packages"]["tool"])
+
+    def test_a_changed_homepage_or_licence_is_published(self):
+        self.run_publish()
+        self.edit_recipe('license="MIT"', 'license="MIT"\nhomepage="https://example.invalid/tool"')
+        self.assertEqual(self.run_publish().refreshed, ["tool"])
+        self.assertEqual(json.loads(self.store.get("index.json"))["packages"]["tool"]["homepage"], "https://example.invalid/tool")
+
+    def test_an_unchanged_recipe_refreshes_nothing(self):
+        self.run_publish()
+        before = self.store.get("dists/stable/InRelease")
+        again = self.run_publish()
+        self.assertEqual((again.published, again.refreshed), ([], []))
+        self.assertEqual(self.store.get("dists/stable/InRelease"), before)
+
+    def test_state_published_before_notes_existed_gets_them(self):
+        self.run_publish()
+        state = json.loads(self.store.get("index.json"))
+        state["packages"]["tool"].pop("note")
+        self.store.put("index.json", json.dumps(state).encode())
+        self.assertEqual(self.run_publish().refreshed, ["tool"])
+        self.assertEqual(json.loads(self.store.get("index.json"))["packages"]["tool"]["note"], "Needs nothing.")
+
+    def test_a_dry_run_never_refreshes(self):
+        self.run_publish()
+        self.edit_recipe('note="Needs nothing."', 'note="Changed."')
+        before = self.store.get("index.json")
+        result = self.run_publish(dry_run=True)
+        self.assertEqual(result.refreshed, [])
+        self.assertEqual(self.store.get("index.json"), before)
+
+    def test_a_recipe_for_an_unpublished_package_is_not_a_refresh(self):
+        self.run_publish()
+        (self.dir / "packages" / "new.toml").write_text(
+            'name="new"\nlicense="MIT"\nnote="n"\n[source]\nrepo="a/n"\n[build]\nkind="tarball"\nlicense_path="L"\n'
+            '[assets]\namd64="n.tgz"\n[package]\nsection="utils"\ndescription="S\\nL"\n')
+        result = self.run_publish(only={"tool"})
+        self.assertEqual(result.refreshed, [])
 
     def test_never_goes_backwards(self):
         self.run_publish()

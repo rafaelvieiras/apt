@@ -112,6 +112,20 @@ def add_version(
     entry["description"] = _short_description(first)
 
 
+def set_metadata(state: dict, name: str, *, homepage: str, license: str, note: str) -> bool:
+    """Refresh the fields that live in the recipe, not in a build. True when anything changed.
+
+    ``add_version`` writes them too, but a recipe edit alone (a new note, a fixed link)
+    builds nothing, so the publisher calls this for every recipe it knows.
+    """
+    entry = state["packages"][name]
+    before = (entry.get("homepage"), entry.get("license"), entry.get("note", ""))
+    entry["homepage"] = homepage
+    entry["license"] = license
+    set_note(state, name, note)
+    return before != (entry.get("homepage"), entry.get("license"), entry.get("note", ""))
+
+
 def set_note(state: dict, name: str, note: str) -> None:
     """Landing-page compatibility note. Optional: old ``index.json`` files have none."""
     entry = state["packages"][name]

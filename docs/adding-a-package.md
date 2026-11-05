@@ -8,7 +8,7 @@ Create `packages/<name>.toml`. The file name must equal `name`.
 name = "yazi"
 license = "MIT"                 # SPDX; must be on the allowlist in aptrepo/licenses.py
 homepage = "https://yazi-rs.github.io"
-note = "Static (musl) build: runs on every Debian and Ubuntu release."   # optional, shown on the Packages page
+note = "Static (musl) build. It runs on every Debian and Ubuntu release."   # optional, shown on the Packages page
 
 [source]
 type = "github-release"
@@ -22,6 +22,10 @@ revision = 1
 amd64 = "yazi-x86_64-unknown-linux-musl.deb"
 arm64 = "yazi-aarch64-unknown-linux-musl.deb"
 ```
+
+`homepage`, `license` and `note` are not part of the `.deb`. If you change only one of them, the next
+publish run notices, rewrites `index.json` and rebuilds the site. It builds no package and re-signs nothing
+that changed, and you do not need `force_index`.
 
 Prefer statically linked (musl) builds: one file then works on every Debian and
 Ubuntu release. A glibc build needs `libc6 >=` whatever it was built against and
