@@ -35,9 +35,10 @@ const flow = [
           <h1>Current tools for <em>Debian</em> and <em>Ubuntu</em></h1>
           <p class="lead">The latest releases of developer tools that your distribution ships late or not at all. One GPG-signed repository, served as plain static files. No account, no cost.</p>
           <div class="cta">
-            <a class="btn primary" href="#install">Add the repository</a>
+            <a class="btn primary" href="#install">Quick install</a>
             <a class="btn" href="/packages">Browse {count} packages</a>
           </div>
+          <p class="adv-link">One command, about a minute. Prefer to do it yourself? <a href="#advanced">Advanced setup</a></p>
           <ul class="stats">
             <li><b>{count}</b><span>packages</span></li>
             <li><b>{repo.architectures.length}</b><span>architectures</span></li>
@@ -58,44 +59,62 @@ const flow = [
     </div>
   </Section>
 
-  <Section id="install" eyebrow="Install" title="Three steps, about a minute" alt>
-    <p slot="sub">Run these as a normal user; they call <code>sudo</code> where needed. Works on current Debian and Ubuntu releases.</p>
+  <Section id="install" eyebrow="Install" title="One command, about a minute" alt>
+    <p slot="sub">Works on current Debian and Ubuntu, on amd64 and arm64. Run it as a normal user; it asks for <code>sudo</code> itself.</p>
     <div class="quick">
-      <h3>The short way</h3>
-      <p>One script does the first two steps below: it adds the key and the source. It checks the key fingerprint before it trusts anything, it only touches those two files, and it never installs a package. <a href="/setup.sh">Read it first</a>; it is under 300 lines of plain <code>sh</code>.</p>
+      <ol class="mini">
+        <li><span class="n" aria-hidden="true">1</span><div><b>Add the repository</b><span>Paste this in a terminal.</span></div></li>
+      </ol>
       <Command command={cmd.quick} label="Copy the one-line installer" />
-      <p class="mut small">Then pick what you want with <code>sudo apt install</code>. To preview the script without changing anything, add <code>--dry-run</code>.</p>
+      <ul class="does">
+        <li>Downloads the signing key and checks its fingerprint before trusting it.</li>
+        <li>Writes the keyring and the source file. Those two files are all it touches.</li>
+        <li>Refreshes the package list for this repository only.</li>
+        <li><b>Never installs a package.</b> You choose what you want.</li>
+      </ul>
+      <ol class="mini">
+        <li><span class="n" aria-hidden="true">2</span><div><b>Install what you need</b><span>As with any package, then it upgrades with the rest of your system.</span></div></li>
+      </ol>
+      <Command command={cmd.use} label="Copy the install command" />
+      <p class="mut small">Every tool is on the <a href="/packages">packages page</a>. Want to see the script first? <a href="/setup.sh">Read setup.sh</a> (plain <code>sh</code>, under 300 lines), or run it with <code>--dry-run</code> to preview without changing anything.</p>
     </div>
-    <p class="manual">Prefer to do it by hand? Steps 1 and 2 are what the script does; step 3 is up to you:</p>
-    <ol class="steps">
-      <li>
-        <div>
-          <h3>Add the signing key</h3>
-          <p>apt checks every download against this key. It lives in its own keyring file, so it is trusted for this repository only.</p>
-        </div>
-        <Terminal title="1. key" code={cmd.key} label="Copy the key commands" />
-      </li>
-      <li>
-        <div>
-          <h3>Add the source</h3>
-          <p>A small DEB822 file that tells apt where to look and which key to trust.</p>
-          <dl>
-            <dt>URIs</dt> <dd>where the repository lives.</dd>
-            <dt>Suites</dt> <dd><code>{repo.suite}</code>, the only suite. It serves every release.</dd>
-            <dt>Components</dt> <dd><code>{repo.component}</code>.</dd>
-            <dt>Signed-By</dt> <dd>pins the key from step 1 to this source.</dd>
-          </dl>
-        </div>
-        <Terminal title={SOURCES.split("/").pop() ?? "sources"} code={cmd.source} label="Copy the sources file command" />
-      </li>
-      <li>
-        <div>
-          <h3>Update and install</h3>
-          <p>Install anything from the <a href="/packages">package list</a>. From then on it upgrades together with the rest of your system.</p>
-        </div>
-        <Terminal title="3. install" code={cmd.update} label="Copy the update and install commands" />
-      </li>
-    </ol>
+
+    <details class="advanced" id="advanced">
+      <summary><span><b>Advanced setup</b><small>Add the key and the source yourself, or inspect each step</small></span></summary>
+      <div class="adv-body">
+        <p>The script does exactly the first two steps below. Run them by hand when you want to review every change, keep the files somewhere else, or automate it with your own tooling.</p>
+        <ol class="steps">
+          <li>
+            <div>
+              <h3>Add the signing key</h3>
+              <p>apt checks every download against this key. It lives in its own keyring file, so it is trusted for this repository only.</p>
+            </div>
+            <Terminal title="1. key" code={cmd.key} label="Copy the key commands" />
+          </li>
+          <li>
+            <div>
+              <h3>Add the source</h3>
+              <p>A small DEB822 file that tells apt where to look and which key to trust.</p>
+              <dl>
+                <dt>URIs</dt> <dd>where the repository lives.</dd>
+                <dt>Suites</dt> <dd><code>{repo.suite}</code>, the only suite. It serves every release.</dd>
+                <dt>Components</dt> <dd><code>{repo.component}</code>.</dd>
+                <dt>Signed-By</dt> <dd>pins the key from step 1 to this source.</dd>
+              </dl>
+            </div>
+            <Terminal title={SOURCES.split("/").pop() ?? "sources"} code={cmd.source} label="Copy the sources file command" />
+          </li>
+          <li>
+            <div>
+              <h3>Refresh and check</h3>
+              <p>Refresh the lists, then confirm the key apt will use matches the <a href="#trust">fingerprint below</a>.</p>
+            </div>
+            <Terminal title="3. refresh" code={cmd.refresh} label="Copy the refresh and verify commands" />
+          </li>
+        </ol>
+        <p class="mut small">The script also accepts <code>--no-update</code> to skip the refresh and <code>--uninstall</code> to remove everything it wrote.</p>
+      </div>
+    </details>
   </Section>
 
   <Section id="featured" eyebrow="Packages" title={`${count} tools, current today`}>
@@ -158,7 +177,9 @@ const flow = [
       <details><summary>Where do the binaries come from?</summary><div>
         <p>From each project's own GitHub release, checksummed and repackaged without changes. Ghostty is the exception: it publishes no Linux binaries, so its <code>.deb</code> comes from the community build <a href="https://github.com/mkasberg/ghostty-ubuntu">mkasberg/ghostty-ubuntu</a>.</p></div></details>
       <details><summary>How do I remove the repository?</summary><div>
-        <p>Delete the source and the key, then refresh. Packages you already installed stay on your system; they just stop receiving updates.</p>
+        <p>Run the script again with <code>--uninstall</code>. It deletes the source and the key, then refreshes. Packages you already installed stay on your system; they just stop receiving updates.</p>
+        <Command command={cmd.quickRemove} label="Copy the uninstall command" />
+        <p>Or by hand:</p>
         <Terminal title="bash" code={cmd.remove} label="Copy the remove commands" /></div></details>
       <details><summary>Can I request a package?</summary><div>
         <p>Yes. <a href={`${SOURCE_URL}/issues/new`}>Open an issue</a> with the upstream link. It needs GitHub releases with Linux builds and a licence that allows redistribution. Static builds are preferred.</p></div></details>
@@ -204,11 +225,25 @@ const flow = [
   .os ul { margin: .6rem 0 0; padding-left: 1.1rem; color: var(--mut); font-size: .93rem; }
 
   /* install steps */
-  .quick { max-width: 46rem; margin: 0 0 2rem; padding: 1.2rem 1.3rem; border: 1px solid var(--line); border-radius: 12px; background: var(--card); display: grid; gap: .8rem; }
-  .quick h3 { font-size: 1.15rem; }
+  .quick { max-width: 46rem; margin: 0 0 1.5rem; padding: 1.4rem 1.5rem; border: 1px solid var(--line); border-left: 4px solid var(--acc); border-radius: 12px; background: var(--card); display: grid; gap: 1rem; box-shadow: var(--shadow); }
   .quick p { margin: 0; color: var(--mut); }
   .quick .small { font-size: .88rem; }
-  .manual { margin: 0 0 1.4rem; color: var(--mut); }
+  .quick .cmd code { font-size: .92rem; }
+  .mini { list-style: none; margin: 0; padding: 0; }
+  .mini li { display: grid; grid-template-columns: 2.2rem 1fr; gap: .8rem; align-items: center; }
+  .mini .n { width: 2.2rem; height: 2.2rem; border-radius: 50%; background: var(--acc); color: var(--acc-fg); display: grid; place-items: center; font-weight: 700; }
+  .mini b { display: block; font-size: 1.1rem; }
+  .mini span:not(.n) { color: var(--mut); font-size: .92rem; }
+  .does { margin: 0; padding-left: 1.2rem; color: var(--mut); font-size: .93rem; display: grid; gap: .3rem; }
+  .does b { color: var(--fg); }
+  .adv-link { margin: -.9rem 0 1.6rem; font-size: .9rem; color: var(--mut); }
+  .advanced { max-width: 62rem; }
+  .advanced summary { padding: 1.1rem 0; align-items: center; }
+  .advanced summary small { display: block; font-weight: 400; color: var(--mut); font-size: .9rem; margin-top: .15rem; }
+  .advanced summary b { font-size: 1.05rem; }
+  .advanced > .adv-body { padding: 0 0 1.4rem; color: var(--fg); }
+  .adv-body > p { color: var(--mut); margin: 0 0 1.5rem; }
+  .adv-body > .small { margin: 1.5rem 0 0; font-size: .88rem; }
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2rem; counter-reset: s; }
   .steps > li { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); counter-increment: s; }
   @media (min-width: 62rem) { .steps > li { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 2.5rem; align-items: start; } }

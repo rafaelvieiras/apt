@@ -80,3 +80,13 @@ if (box && input) {
   });
   apply();
 }
+
+// Links to #advanced (hero, nav) open the collapsed section; without JavaScript the summary still toggles it.
+const advanced = document.getElementById("advanced");
+if (advanced) {
+  const openIfLinked = () => {
+    if (location.hash === "#advanced") advanced.open = true;
+  };
+  openIfLinked();
+  window.addEventListener("hashchange", openIfLinked);
+}
