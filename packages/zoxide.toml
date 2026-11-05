@@ -1,7 +1,7 @@
 name = "zoxide"
 license = "MIT"
 homepage = "https://github.com/ajeetdsouza/zoxide"
-note = "Static (musl) build. It runs on every Debian and Ubuntu release. (test)"
+note = "Static (musl) build. It runs on every Debian and Ubuntu release."
 
 [source]
 type = "github-release"
