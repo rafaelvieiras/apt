@@ -115,7 +115,7 @@ export function install() {
       "# 3. install something",
       `sudo apt update && sudo apt install ${sample}`,
     ].join("\n"),
-    hero: ["# add the repository (key + source, fingerprint checked)", `curl -fsSL ${base}/setup.sh | sudo sh`, "# then install anything from it, as usual", `sudo apt install ${sample}`].join("\n"),
+    hero: ["# add the repository", `curl -fsSL ${base}/setup.sh | sudo sh`, "# then install what you need", `sudo apt install ${sample}`].join("\n"),
     use: `sudo apt install ${sample}`,
     refresh: `sudo apt update\ngpg --show-keys --fingerprint ${KEYRING}`,
     quick: `curl -fsSL ${base}/setup.sh | sudo sh`,

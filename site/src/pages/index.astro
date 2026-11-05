@@ -12,17 +12,17 @@ const cmd = install();
 const count = packages.length;
 const arches = repo.architectures.join(", ");
 const why = [
-  ["clock", "Current, not frozen", `A bot checks every upstream project every ${CHECK_HOURS} hours and publishes new releases by itself. No waiting for the next distribution release.`],
-  ["layers", "One suite, every release", "Static or portable builds, so the same repository serves Debian and Ubuntu, old and new. Packages that need more say so."],
-  ["shield", "Signed, and you can check it", "Every index is signed with GPG. Compare the fingerprint below with the key apt will use before you trust it."],
-  ["nobody", "No account, no tracking", "Plain static files over HTTPS. No sign-up, no cookies, no analytics, and nothing on this site calls another server."],
-  ["code", "Open and repeatable", "Recipes and builder are public. Packages come from upstream's own releases, checksummed, and tarball builds are reproducible."],
+  ["clock", "Fresh versions", `A bot checks every upstream project every ${CHECK_HOURS} hours and publishes new releases on its own. You don't wait for the next distribution release.`],
+  ["layers", "One suite, every release", "The builds are static or portable, so one repository works on old and new Debian and Ubuntu. If a package needs a newer system, it says so."],
+  ["shield", "Signed, and you can check it", "A GPG key signs every index. Compare the fingerprint on this page with the key apt uses before you trust it."],
+  ["nobody", "No account, no tracking", "It's static files over HTTPS. You don't sign up, and this site sets no cookies, runs no analytics and calls no other server."],
+  ["code", "Open recipes", "The recipes and the builder are public. Every package comes from its upstream release, and we check the checksum. Tarball builds are reproducible."],
 ] as const;
 const flow = [
-  ["Upstream release", "A project publishes a release on GitHub. Nothing is patched."],
-  ["Build and sign", `GitHub Actions, every ${CHECK_HOURS} hours: verify checksums, check the licence, build the .deb, sign the index with GPG.`],
-  ["Store", "Static files in a Cloudflare R2 bucket. Old versions are pruned; a published package never changes."],
-  ["Serve", "Cloudflare CDN over HTTPS. apt only needs plain GET requests."],
+  ["Upstream release", "A project publishes a release on GitHub. We do not patch it."],
+  ["Build and sign", `Every ${CHECK_HOURS} hours, GitHub Actions verifies checksums, checks the licence, builds the .deb and signs the index with GPG.`],
+  ["Store", "The files go to a Cloudflare R2 bucket. Old versions are pruned, and a published package never changes."],
+  ["Serve", "Cloudflare's CDN serves them over HTTPS. apt only needs plain GET requests."],
 ];
 ---
 <Layout title={`${repo.name}: current developer tools for Debian and Ubuntu`} description={repo.description}>
@@ -33,12 +33,12 @@ const flow = [
         <div>
           <span class="pill"><i></i>Signed · static · free</span>
           <h1>Current tools for <em>Debian</em> and <em>Ubuntu</em></h1>
-          <p class="lead">The latest releases of developer tools that your distribution ships late or not at all. One GPG-signed repository, served as plain static files. No account, no cost.</p>
+          <p class="lead">The latest releases of developer tools that Debian and Ubuntu ship late, or not at all. The index is GPG-signed and the files are plain static files. It's free, and you need no account.</p>
           <div class="cta">
             <a class="btn primary" href="#install">Quick install</a>
             <a class="btn" href="/packages">Browse {count} packages</a>
           </div>
-          <p class="adv-link">One command, about a minute. Prefer to do it yourself? <a href="#advanced">Advanced setup</a></p>
+          <p class="adv-link">One command, about a minute. Want to do it yourself? Try the <a href="#advanced">advanced setup</a>.</p>
           <ul class="stats">
             <li><b>{count}</b><span>packages</span></li>
             <li><b>{repo.architectures.length}</b><span>architectures</span></li>
@@ -50,8 +50,8 @@ const flow = [
     </div>
   </div>
 
-  <Section id="why" eyebrow="Why this repository" title="Boring infrastructure, fresh software">
-    <p slot="sub">Debian and Ubuntu freeze versions for years. This repository does not.</p>
+  <Section id="why" eyebrow="Why this repository" title="Simple infrastructure, fresh software">
+    <p slot="sub">Debian and Ubuntu freeze versions for years. This repository doesn't.</p>
     <div class="grid why">
       {why.map(([icon, title, text]) => (
         <div class="card"><Icon name={icon} /><h3>{title}</h3><p>{text}</p></div>
@@ -60,46 +60,46 @@ const flow = [
   </Section>
 
   <Section id="install" eyebrow="Install" title="One command, about a minute" alt>
-    <p slot="sub">Works on current Debian and Ubuntu, on amd64 and arm64. Run it as a normal user; it asks for <code>sudo</code> itself.</p>
+    <p slot="sub">It works on current Debian and Ubuntu, on amd64 and arm64. Run it as a normal user. The script asks for <code>sudo</code> when it needs it.</p>
     <div class="quick">
       <ol class="mini">
         <li><span class="n" aria-hidden="true">1</span><div><b>Add the repository</b><span>Paste this in a terminal.</span></div></li>
       </ol>
       <Command command={cmd.quick} label="Copy the one-line installer" />
       <ul class="does">
-        <li>Downloads the signing key and checks its fingerprint before trusting it.</li>
-        <li>Writes the keyring and the source file. Those two files are all it touches.</li>
-        <li>Refreshes the package list for this repository only.</li>
-        <li><b>Never installs a package.</b> You choose what you want.</li>
+        <li>It downloads the signing key and checks the fingerprint before it trusts it.</li>
+        <li>It writes the keyring and the source file, and touches nothing else.</li>
+        <li>It refreshes the package list for this repository only.</li>
+        <li><b>It never installs a package.</b> You choose what you want.</li>
       </ul>
       <ol class="mini">
-        <li><span class="n" aria-hidden="true">2</span><div><b>Install what you need</b><span>As with any package, then it upgrades with the rest of your system.</span></div></li>
+        <li><span class="n" aria-hidden="true">2</span><div><b>Install what you need</b><span>Use apt as usual. The package then upgrades with the rest of your system.</span></div></li>
       </ol>
       <Command command={cmd.use} label="Copy the install command" />
-      <p class="mut small">Every tool is on the <a href="/packages">packages page</a>. Want to see the script first? <a href="/setup.sh">Read setup.sh</a> (plain <code>sh</code>, under 300 lines), or run it with <code>--dry-run</code> to preview without changing anything.</p>
+      <p class="mut small">Every tool is on the <a href="/packages">packages page</a>. Want to read the script first? <a href="/setup.sh">Open setup.sh</a>. It's plain <code>sh</code> and under 300 lines. To preview it without changing anything, add <code>--dry-run</code>.</p>
     </div>
 
     <details class="advanced" id="advanced">
-      <summary><span><b>Advanced setup</b><small>Add the key and the source yourself, or inspect each step</small></span></summary>
+      <summary><span><b>Advanced setup</b><small>Add the key and the source yourself, or check each step</small></span></summary>
       <div class="adv-body">
-        <p>The script does exactly the first two steps below. Run them by hand when you want to review every change, keep the files somewhere else, or automate it with your own tooling.</p>
+        <p>The script does steps 1 and 2 below. Run them by hand if you want to review every change, keep the files somewhere else, or use them in your own automation.</p>
         <ol class="steps">
           <li>
             <div>
               <h3>Add the signing key</h3>
-              <p>apt checks every download against this key. It lives in its own keyring file, so it is trusted for this repository only.</p>
+              <p>apt checks every download against this key. It lives in its own keyring file, so apt trusts it for this repository only.</p>
             </div>
             <Terminal title="1. key" code={cmd.key} label="Copy the key commands" />
           </li>
           <li>
             <div>
               <h3>Add the source</h3>
-              <p>A small DEB822 file that tells apt where to look and which key to trust.</p>
+              <p>A small DEB822 file tells apt where to look and which key to trust.</p>
               <dl>
                 <dt>URIs</dt> <dd>where the repository lives.</dd>
-                <dt>Suites</dt> <dd><code>{repo.suite}</code>, the only suite. It serves every release.</dd>
+                <dt>Suites</dt> <dd><code>{repo.suite}</code> is the only suite. It serves every release.</dd>
                 <dt>Components</dt> <dd><code>{repo.component}</code>.</dd>
-                <dt>Signed-By</dt> <dd>pins the key from step 1 to this source.</dd>
+                <dt>Signed-By</dt> <dd>ties the key from step 1 to this source.</dd>
               </dl>
             </div>
             <Terminal title={SOURCES.split("/").pop() ?? "sources"} code={cmd.source} label="Copy the sources file command" />
@@ -107,18 +107,18 @@ const flow = [
           <li>
             <div>
               <h3>Refresh and check</h3>
-              <p>Refresh the lists, then confirm the key apt will use matches the <a href="#trust">fingerprint below</a>.</p>
+              <p>Refresh the lists, then confirm the key apt uses matches the <a href="#trust">fingerprint below</a>.</p>
             </div>
             <Terminal title="3. refresh" code={cmd.refresh} label="Copy the refresh and verify commands" />
           </li>
         </ol>
-        <p class="mut small">The script also accepts <code>--no-update</code> to skip the refresh and <code>--uninstall</code> to remove everything it wrote.</p>
+        <p class="mut small">The script also takes <code>--no-update</code> to skip the refresh and <code>--uninstall</code> to remove everything it wrote.</p>
       </div>
     </details>
   </Section>
 
   <Section id="featured" eyebrow="Packages" title={`${count} tools, current today`}>
-    <p slot="sub">A taste of what is in here. Every package has its version, architectures, licence and compatibility notes on the <a href="/packages">packages page</a>.</p>
+    <p slot="sub">A few of them. The <a href="/packages">packages page</a> has the version, architectures, licence and compatibility notes of each one.</p>
     <ul class="grid strip">
       {featured.map((pkg) => (
         <li class="card">
@@ -131,10 +131,10 @@ const flow = [
   </Section>
 
   <Section id="systems" eyebrow="Compatibility" title="Supported systems" alt>
-    <p slot="sub">One suite serves everything. A package that needs a newer system says so, and apt refuses to install it where it would not run.</p>
+    <p slot="sub">One suite serves every system. If a package needs a newer one, its note says so, and apt won't install it where it can't run.</p>
     <div class="os">
-      <div class="card"><h3>Distributions</h3><ul><li>Debian 12 and newer</li><li>Ubuntu 22.04 and newer (some tools need a newer one, see the notes)</li><li>Derivatives such as Linux Mint and Pop!_OS</li></ul></div>
-      <div class="card"><h3>Architectures</h3><ul><li><code>amd64</code>: PCs and most servers</li><li><code>arm64</code>: Raspberry Pi, ARM servers and laptops</li><li><code>all</code>: architecture-independent packages, such as a Python zipapp</li></ul></div>
+      <div class="card"><h3>Distributions</h3><ul><li>Debian 12 and newer</li><li>Ubuntu 22.04 and newer (some tools need a newer release, see the notes)</li><li>Derivatives such as Linux Mint and Pop!_OS</li></ul></div>
+      <div class="card"><h3>Architectures</h3><ul><li><code>amd64</code>: PCs and most servers</li><li><code>arm64</code>: Raspberry Pi, ARM servers and laptops</li><li><code>all</code>: packages that don't depend on the architecture, such as a Python zipapp</li></ul></div>
       <div class="card"><h3>Published here</h3><ul><li>Suite <code>{repo.suite}</code>, component <code>{repo.component}</code></li><li>Architectures: {arches}</li><li>The newest {repo.retain} versions of each package</li></ul></div>
     </div>
   </Section>
@@ -149,13 +149,13 @@ const flow = [
       </ol>
       <div>
         <h3>Signing key fingerprint</h3>
-        <p class="mut gap">After step 1, print the fingerprint of the key apt will use. It must match this one exactly.</p>
+        <p class="mut gap">After step 1, print the fingerprint of the key apt uses. It must match this one exactly.</p>
         <div class="fp-row">
           <p class="fp" aria-label="Signing key fingerprint">{data.fingerprint.pretty}</p>
           <CopyButton tone="light" text={data.fingerprint.raw} label="Copy the fingerprint without spaces" />
         </div>
         <Terminal title="verify" code={cmd.verify} label="Copy the verify command" />
-        <p class="mut gap">This site and the key are served from the same host. To check the key independently, compare it with the copy in the <a href={`${SOURCE_URL}/blob/main/keys/rafaelvieiras-apt.asc`}>source repository</a>.</p>
+        <p class="mut gap">This site and the key come from the same host. To check the key on its own, compare it with the copy in the <a href={`${SOURCE_URL}/blob/main/keys/rafaelvieiras-apt.asc`}>source repository</a>.</p>
         <ul class="links">
           <li><a href={SOURCE_URL}>Source code</a></li>
           <li><a href={`${repo.baseUrl}/index.json`}><code>index.json</code></a></li>
@@ -169,22 +169,22 @@ const flow = [
   <Section id="faq" eyebrow="FAQ" title="Questions you may have" alt>
     <div class="faq">
       <details><summary>How do updates arrive?</summary><div>
-        <p>Every {CHECK_HOURS} hours a GitHub Actions job looks for new upstream releases, builds and signs what changed, and uploads it. On your side it is the usual routine: <code>sudo apt update &amp;&amp; sudo apt upgrade</code>.</p></div></details>
+        <p>Every {CHECK_HOURS} hours, a GitHub Actions job looks for new upstream releases. It builds and signs what changed, then uploads it. On your side it's the usual routine: <code>sudo apt update &amp;&amp; sudo apt upgrade</code>.</p></div></details>
       <details><summary>What if my distribution ships the same package?</summary><div>
-        <p>apt installs the highest version it can see. These packages usually carry the newer upstream version, so they win. To see which one apt would pick:</p>
+        <p>apt installs the highest version it can see. These packages usually have the newer upstream version, so they win. To see which one apt picks:</p>
         <Command command={cmd.policy} label="Copy the apt policy command" />
         <p>To keep the distribution version, pin it with a file in <code>/etc/apt/preferences.d/</code>.</p></div></details>
       <details><summary>Where do the binaries come from?</summary><div>
-        <p>From each project's own GitHub release, checksummed and repackaged without changes. Ghostty is the exception: it publishes no Linux binaries, so its <code>.deb</code> comes from the community build <a href="https://github.com/mkasberg/ghostty-ubuntu">mkasberg/ghostty-ubuntu</a>.</p></div></details>
+        <p>They come from each project's own GitHub release. We check the checksum and repackage them without changes. Ghostty is the exception. It publishes no Linux binaries, so its <code>.deb</code> comes from the community build <a href="https://github.com/mkasberg/ghostty-ubuntu">mkasberg/ghostty-ubuntu</a>.</p></div></details>
       <details><summary>How do I remove the repository?</summary><div>
-        <p>Run the script again with <code>--uninstall</code>. It deletes the source and the key, then refreshes. Packages you already installed stay on your system; they just stop receiving updates.</p>
+        <p>Run the script again with <code>--uninstall</code>. It deletes the source and the key, then refreshes. The packages you installed stay on your system, but they stop receiving updates.</p>
         <Command command={cmd.quickRemove} label="Copy the uninstall command" />
         <p>Or by hand:</p>
         <Terminal title="bash" code={cmd.remove} label="Copy the remove commands" /></div></details>
       <details><summary>Can I request a package?</summary><div>
-        <p>Yes. <a href={`${SOURCE_URL}/issues/new`}>Open an issue</a> with the upstream link. It needs GitHub releases with Linux builds and a licence that allows redistribution. Static builds are preferred.</p></div></details>
+        <p>Yes. <a href={`${SOURCE_URL}/issues/new`}>Open an issue</a> with the upstream link. The project needs GitHub releases with Linux builds and a licence that allows redistribution. Static builds are best.</p></div></details>
       <details><summary>Does this site track me?</summary><div>
-        <p>No cookies, no analytics and no external requests. Like any website, the host (Cloudflare) handles the HTTPS requests themselves.</p></div></details>
+        <p>No. There are no cookies, no analytics and no external requests. Like any website, the host (Cloudflare) handles the HTTPS requests.</p></div></details>
     </div>
   </Section>
 </Layout>

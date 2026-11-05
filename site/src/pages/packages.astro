@@ -37,7 +37,7 @@ const total = packages.length + transitional.length;
       {transitional.length > 0 && (
         <div class="trans" data-group>
           <h2>Transitional packages</h2>
-          <p class="mut">Empty on purpose. They exist so that upgrades from the distribution packages keep working, and you can remove them once the real package is installed.</p>
+          <p class="mut">Empty on purpose. They keep upgrades from the distribution packages working, and you can remove them once the real package is installed.</p>
           <ul class="list">
             {transitional.map((pkg) => <PackageRow pkg={pkg} />)}
           </ul>
@@ -45,7 +45,7 @@ const total = packages.length + transitional.length;
       )}
 
       <p class="foot mut">
-        Versions are upstream versions. Newest {repo.retain} builds of each package stay available; run <code>apt policy &lt;name&gt;</code> to see
+        Versions are upstream versions. The newest {repo.retain} builds of each package stay available. Run <code>apt policy &lt;name&gt;</code> to see
         which one apt would install. Last built <time datetime={data.generated}>{data.generated.slice(0, 16).replace("T", " ")} UTC</time>.
       </p>
     </div>

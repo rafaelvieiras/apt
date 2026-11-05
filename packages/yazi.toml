@@ -1,7 +1,7 @@
 name = "yazi"
 license = "MIT"
 homepage = "https://yazi-rs.github.io"
-note = "Static (musl) build: runs on every Debian and Ubuntu release."
+note = "Static (musl) build. It runs on every Debian and Ubuntu release."
 
 [source]
 type = "github-release"

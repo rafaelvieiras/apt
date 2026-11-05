@@ -1,7 +1,7 @@
 name = "yt-dlp"
 license = "Unlicense"
 homepage = "https://github.com/yt-dlp/yt-dlp"
-note = "Needs Python 3.11 or newer: Debian 12+, Ubuntu 24.04+ (not Ubuntu 22.04)."
+note = "Needs Python 3.11 or newer: Debian 12+ and Ubuntu 24.04+, not Ubuntu 22.04."
 
 [source]
 type = "github-release"
