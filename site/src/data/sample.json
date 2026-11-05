@@ -5,7 +5,7 @@
  "indexGenerated": "2026-04-01T12:00:03Z",
  "repo": {
   "name": "rafaelvieiras apt",
-  "description": "Current builds of developer tools that Debian and Ubuntu package late or not at all.",
+  "description": "Current versions of developer tools that Debian and Ubuntu ship late, or not at all.",
   "baseUrl": "https://apt.rafaelvieiras.com",
   "suite": "stable",
   "component": "main",

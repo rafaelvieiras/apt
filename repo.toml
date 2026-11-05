@@ -2,7 +2,7 @@
 [repository]
 origin = "rafaelvieiras apt"
 label = "rafaelvieiras apt"
-description = "Current builds of developer tools that Debian and Ubuntu package late or not at all."
+description = "Current versions of developer tools that Debian and Ubuntu ship late, or not at all."
 suite = "stable"
 component = "main"
 architectures = ["amd64", "arm64"]
