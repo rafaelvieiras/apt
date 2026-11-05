@@ -31,7 +31,7 @@ jobs:
       - name: POSIX syntax (dash)
         run: dash -n site/public/setup.sh
       - name: Dry run
-        run: sh site/public/setup.sh --dry-run neovim
+        run: sh site/public/setup.sh --dry-run
 
   # The landing site must always build, against sample data (no R2, no secrets).
   site:

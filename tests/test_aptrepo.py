@@ -688,17 +688,20 @@ class SetupScript(unittest.TestCase):
     def test_dry_run_changes_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {"PATH": "/usr/bin:/bin", "HOME": tmp, "TMPDIR": tmp, "NO_COLOR": "1"}
-            done = subprocess.run(["sh", str(self.ROOT / "site" / "public" / "setup.sh"), "--dry-run", "neovim"],
+            done = subprocess.run(["sh", str(self.ROOT / "site" / "public" / "setup.sh"), "--dry-run"],
                                   capture_output=True, text=True, env=env, timeout=30)
             self.assertEqual(done.returncode, 0, done.stderr)
-            self.assertIn("apt-get install -y neovim", done.stderr)
+            self.assertIn("nothing was installed", done.stderr)
             self.assertEqual(list(Path(tmp).iterdir()), [], "dry run must leave no temporary files behind")
 
-    def test_rejects_hostile_package_names(self):
-        for name in ("a;rm -rf /", "$(id)", "-x", "A", "x y"):
-            done = subprocess.run(["sh", str(self.ROOT / "site" / "public" / "setup.sh"), "--dry-run", "--", name],
+    def test_never_installs_packages(self):
+        self.assertNotIn("apt-get install", self.SCRIPT)
+        self.assertNotIn("apt install -y", self.SCRIPT)
+        for args in (["neovim"], ["--", "neovim"], ["--dry-run", "a;rm -rf /"]):
+            done = subprocess.run(["sh", str(self.ROOT / "site" / "public" / "setup.sh"), *args],
                                   capture_output=True, text=True, timeout=30)
-            self.assertNotEqual(done.returncode, 0, name)
+            self.assertEqual(done.returncode, 2, args)
+            self.assertIn("unknown argument", done.stderr)
 
 
 class RecipeNote(unittest.TestCase):

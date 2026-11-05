@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `setup.sh`: a POSIX `sh` installer served at `/setup.sh`. It verifies the signing key (fingerprint
-  with `gpg`, checksum without), writes the keyring and the DEB822 source, refreshes only that source,
-  and installs the packages named on the command line. Supports `--dry-run`, `--no-update` and
+  with `gpg`, checksum without), writes the keyring and the DEB822 source, and refreshes
+  only that source. It never installs a package. Supports `--dry-run`, `--no-update` and
   `--uninstall`, and is idempotent. Tests keep its pinned values in step with `repo.toml` and `keys/`.
 - `aptrepo`: recipe parser, licence gate, `.deb` builder, index renderer with
   `by-hash`, GnuPG signing, directory and Cloudflare R2 storage, static landing page.

@@ -10,13 +10,13 @@
 
 ## Use it
 
-The short way. [`setup.sh`](site/public/setup.sh) adds the key and the source, checks the key
-fingerprint, and installs any package you name:
+The short way. [`setup.sh`](site/public/setup.sh) adds the key and the source and checks the key
+fingerprint. It never installs a package:
 
 ```bash
 curl -fsSL https://apt.rafaelvieiras.com/setup.sh | sudo sh                    # add the repository
-curl -fsSL https://apt.rafaelvieiras.com/setup.sh | sudo sh -s -- neovim yazi  # ...and install these
 curl -fsSL https://apt.rafaelvieiras.com/setup.sh | sudo sh -s -- --uninstall  # remove it again
+sudo apt install neovim yazi                                                   # then use apt as usual
 ```
 
 Add `--dry-run` to see every step without changing anything, or download the file and read it first.

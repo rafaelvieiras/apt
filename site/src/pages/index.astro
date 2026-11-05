@@ -62,9 +62,9 @@ const flow = [
     <p slot="sub">Run these as a normal user; they call <code>sudo</code> where needed. Works on current Debian and Ubuntu releases.</p>
     <div class="quick">
       <h3>The short way</h3>
-      <p>One script does all three steps below. It checks the key fingerprint before it trusts anything, and it only touches the two files named below. <a href="/setup.sh">Read it first</a>; it is under 300 lines of plain <code>sh</code>.</p>
+      <p>One script does the first two steps below: it adds the key and the source. It checks the key fingerprint before it trusts anything, it only touches those two files, and it never installs a package. <a href="/setup.sh">Read it first</a>; it is under 300 lines of plain <code>sh</code>.</p>
       <Command command={cmd.quick} label="Copy the one-line installer" />
-      <p class="mut small">Add package names to install them at once: <code>sudo sh -s -- neovim yazi</code>. Preview without changing anything with <code>--dry-run</code>.</p>
+      <p class="mut small">Then pick what you want with <code>sudo apt install</code>. To preview the script without changing anything, add <code>--dry-run</code>.</p>
     </div>
     <p class="manual">Prefer to do it by hand? Same result, three commands:</p>
     <ol class="steps">

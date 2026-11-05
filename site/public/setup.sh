@@ -2,15 +2,15 @@
 # setup.sh: add the rafaelvieiras apt repository to this machine.
 #
 #   curl -fsSL https://apt.rafaelvieiras.com/setup.sh | sudo sh
-#   curl -fsSL https://apt.rafaelvieiras.com/setup.sh | sudo sh -s -- neovim yazi
 #   curl -fsSL https://apt.rafaelvieiras.com/setup.sh | sudo sh -s -- --uninstall
 #
 # What it does, and nothing else:
 #   1. downloads the signing key and checks its fingerprint (when gpg is installed);
 #   2. writes the key to        /etc/apt/keyrings/rafaelvieiras-apt.gpg
 #   3. writes the source to     /etc/apt/sources.list.d/rafaelvieiras-apt.sources
-#   4. refreshes the package lists of this one source;
-#   5. installs the packages named on the command line, if any.
+#   4. refreshes the package lists of this one source.
+#
+# It never installs a package. Afterwards, use apt as usual: sudo apt install <package>
 #
 # Plain POSIX sh. Read it before you run it: https://apt.rafaelvieiras.com/setup.sh
 # Source: https://github.com/rafaelvieiras/apt (site/public/setup.sh)
@@ -30,7 +30,6 @@ SOURCES="/etc/apt/sources.list.d/rafaelvieiras-apt.sources"
 DRY_RUN=0
 UNINSTALL=0
 DO_UPDATE=1
-PACKAGES=""
 SUDO=""
 TMP=""
 
@@ -47,10 +46,10 @@ die()  { printf '%serror:%s %s\n' "$RED" "$RESET" "$*" >&2; exit 1; }
 
 usage() {
     cat <<'EOF'
-Usage: setup.sh [options] [package ...]
+Usage: setup.sh [options]
 
 Adds the rafaelvieiras apt repository (signed, static) to Debian or Ubuntu.
-Packages named on the command line are installed after the repository is set up.
+It sets up the source and the key, and nothing else: no package is installed.
 
 Options:
   -n, --dry-run     show what would happen; change nothing, download nothing
@@ -60,7 +59,6 @@ Options:
 
 Examples:
   sudo sh setup.sh
-  sudo sh setup.sh neovim yazi ripgrep
   sudo sh setup.sh --uninstall
 
 Environment:
@@ -100,23 +98,10 @@ parse_args() {
             -n|--dry-run) DRY_RUN=1 ;;
             --no-update) DO_UPDATE=0 ;;
             --uninstall|--remove) UNINSTALL=1 ;;
-            --) shift; while [ $# -gt 0 ]; do add_package "$1"; shift; done; break ;;
-            -*) usage >&2; printf '\nunknown option: %s\n' "$1" >&2; exit 2 ;;
-            *) add_package "$1" ;;
+            *) usage >&2; printf '\nunknown argument: %s\n' "$1" >&2; exit 2 ;;
         esac
         shift
     done
-    if [ "$UNINSTALL" = 1 ] && [ -n "$PACKAGES" ]; then
-        die "--uninstall does not take package names"
-    fi
-}
-
-add_package() {
-    # Debian package names only; this keeps the unquoted expansion below safe.
-    case "$1" in
-        ""|[!a-z0-9]*|*[!a-z0-9+.-]*) die "not a valid package name: $1" ;;
-    esac
-    PACKAGES="$PACKAGES $1"
 }
 
 check_system() {
@@ -162,7 +147,7 @@ download() {
     elif command -v wget >/dev/null 2>&1; then
         wget -q --tries=3 --timeout=30 -O "$2" "$1"
     else
-        die "neither curl nor wget found. Install one first: apt-get install curl ca-certificates"
+        die "neither curl nor wget found. Install curl (and ca-certificates) first, then run this again."
     fi
 }
 
@@ -249,19 +234,9 @@ do_install() {
         refresh_lists
     fi
 
-    if [ -n "$PACKAGES" ]; then
-        # The packages were named on the command line, so ask no further questions.
-        # The prompt would also read the pipe that carries this script.
-        say "Installing:$PACKAGES"
-        # shellcheck disable=SC2086  # names were validated in add_package
-        as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y $PACKAGES
-    fi
-
-    say "Done."
-    if [ -z "$PACKAGES" ]; then
-        note "Install something with:  sudo apt install <package>"
-        note "Everything available:    $BASE_URL/packages"
-    fi
+    say "Done. The repository is ready; nothing was installed."
+    note "Install something with:  sudo apt install <package>"
+    note "Everything available:    $BASE_URL/packages"
     note "Remove the repository with: curl -fsSL $BASE_URL/setup.sh | sudo sh -s -- --uninstall"
 }
 
